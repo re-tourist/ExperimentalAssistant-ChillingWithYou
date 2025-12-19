@@ -40,14 +40,14 @@
         SELECT
             rm.metric_def_id as metricDefId,
             md.name as metricName,
-            rm.value as value,
+            rm.metric_value as value,
             r.id as runId
         FROM run r
         JOIN run_metric rm ON r.id = rm.run_id
         JOIN metric_def md ON rm.metric_def_id = md.id
         <include refid="commonWhere"/>
         ORDER BY
-            CASE WHEN md.direction = 'MAX' THEN rm.value ELSE -rm.value END DESC
+            CASE WHEN md.direction = 'MAX' THEN rm.metric_value ELSE -rm.metric_value END DESC
         LIMIT 1
     </select>
 
@@ -55,8 +55,8 @@
         SELECT
             DATE_FORMAT(r.created_at, '%Y-%m-%d') as x,
             <choose>
-                <when test="filter.direction == 'MAX'">MAX(rm.value)</when>
-                <otherwise>MIN(rm.value)</otherwise>
+                <when test="filter.direction == 'MAX'">MAX(rm.metric_value)</when>
+                <otherwise>MIN(rm.metric_value)</otherwise>
             </choose> as y
         FROM run r
         JOIN run_metric rm ON r.id = rm.run_id
@@ -103,7 +103,7 @@
             r.name as runName,
             r.model_name as modelName,
             r.dataset_name as datasetName,
-            rm.value as value,
+            rm.metric_value as value,
             r.created_at as createdAt,
             r.status as status
         FROM run r
@@ -112,8 +112,8 @@
         AND rm.metric_def_id = #{filter.metricDefId}
         ORDER BY
         <choose>
-            <when test="filter.direction == 'MAX'">rm.value DESC</when>
-            <otherwise>rm.value ASC</otherwise>
+            <when test="filter.direction == 'MAX'">rm.metric_value DESC</when>
+            <otherwise>rm.metric_value ASC</otherwise>
         </choose>
         LIMIT #{filter.limit}
     </select>

@@ -1,6 +1,7 @@
 package com.experimentalassistant.backend.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -12,5 +13,6 @@ public class RunMetric {
     private Long id;
     private Long runId;
     private Long metricDefId;
+    @TableField("metric_value")
     private Double value;
 }
