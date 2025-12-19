@@ -26,6 +26,7 @@ export interface RunDetail extends Run {
 export interface RunCreateUpdate {
   projectId: number
   name: string
+  status?: string // Added status
   modelName?: string
   datasetName?: string
   optimizer?: string
