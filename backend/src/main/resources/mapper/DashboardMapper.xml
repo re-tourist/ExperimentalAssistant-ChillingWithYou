@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.experimentalassistant.backend.mapper.DashboardMapper">
+
+    <sql id="commonWhere">
+        <where>
+            r.project_id = #{filter.projectId}
+            <if test="filter.dateFrom != null and filter.dateFrom != ''">
+                AND r.created_at &gt;= #{filter.dateFrom}
+            </if>
+            <if test="filter.dateTo != null and filter.dateTo != ''">
+                AND r.created_at &lt;= CONCAT(#{filter.dateTo}, ' 23:59:59')
+            </if>
+            <if test="filter.status != null and filter.status != ''">
+                AND r.status = #{filter.status}
+            </if>
+            <if test="filter.tagIds != null and filter.tagIds.size() > 0">
+                AND EXISTS (
+                    SELECT 1 FROM run_tag rt_filter
+                    WHERE rt_filter.run_id = r.id
+                    AND rt_filter.tag_id IN
+                    <foreach item="tagId" collection="filter.tagIds" open="(" separator="," close=")">
+                        #{tagId}
+                    </foreach>
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="getSummaryStats" resultType="com.experimentalassistant.backend.dto.DashboardStatsResult">
+        SELECT
+            COUNT(*) as totalRuns,
+            SUM(CASE WHEN r.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) THEN 1 ELSE 0 END) as runsLast7Days,
+            SUM(CASE WHEN r.status = 'FINISHED' THEN 1 ELSE 0 END) as finishedRuns
+        FROM run r
+        <include refid="commonWhere"/>
+    </select>
+
+    <select id="getBestMetric" resultType="com.experimentalassistant.backend.dto.DashboardSummaryResponse$BestMetric">
+        SELECT
+            rm.metric_def_id as metricDefId,
+            md.name as metricName,
+            rm.value as value,
+            r.id as runId
+        FROM run r
+        JOIN run_metric rm ON r.id = rm.run_id
+        JOIN metric_def md ON rm.metric_def_id = md.id
+        <include refid="commonWhere"/>
+        ORDER BY
+            CASE WHEN md.direction = 'MAX' THEN rm.value ELSE -rm.value END DESC
+        LIMIT 1
+    </select>
+
+    <select id="getTrend" resultType="com.experimentalassistant.backend.dto.DashboardTrendPoint">
+        SELECT
+            DATE_FORMAT(r.created_at, '%Y-%m-%d') as x,
+            <choose>
+                <when test="filter.direction == 'MAX'">MAX(rm.value)</when>
+                <otherwise>MIN(rm.value)</otherwise>
+            </choose> as y
+        FROM run r
+        JOIN run_metric rm ON r.id = rm.run_id
+        <include refid="commonWhere"/>
+        AND rm.metric_def_id = #{filter.metricDefId}
+        GROUP BY DATE_FORMAT(r.created_at, '%Y-%m-%d')
+        ORDER BY x ASC
+    </select>
+
+    <select id="getDistribution" resultType="com.experimentalassistant.backend.dto.DashboardDistributionItem">
+        <choose>
+            <when test="filter.distributionBy == 'tag'">
+                SELECT
+                    t.name as name,
+                    COUNT(DISTINCT r.id) as value
+                FROM run r
+                JOIN run_tag rt ON r.id = rt.run_id
+                JOIN tag t ON rt.tag_id = t.id
+                <include refid="commonWhere"/>
+                GROUP BY t.name
+            </when>
+            <when test="filter.distributionBy == 'model'">
+                SELECT
+                    IFNULL(r.model_name, 'Unknown') as name,
+                    COUNT(*) as value
+                FROM run r
+                <include refid="commonWhere"/>
+                GROUP BY r.model_name
+            </when>
+            <when test="filter.distributionBy == 'dataset'">
+                SELECT
+                    IFNULL(r.dataset_name, 'Unknown') as name,
+                    COUNT(*) as value
+                FROM run r
+                <include refid="commonWhere"/>
+                GROUP BY r.dataset_name
+            </when>
+        </choose>
+    </select>
+
+    <select id="getTopRuns" resultType="com.experimentalassistant.backend.dto.DashboardTopRun">
+        SELECT
+            r.id as runId,
+            r.name as runName,
+            r.model_name as modelName,
+            r.dataset_name as datasetName,
+            rm.value as value,
+            r.created_at as createdAt,
+            r.status as status
+        FROM run r
+        JOIN run_metric rm ON r.id = rm.run_id
+        <include refid="commonWhere"/>
+        AND rm.metric_def_id = #{filter.metricDefId}
+        ORDER BY
+        <choose>
+            <when test="filter.direction == 'MAX'">rm.value DESC</when>
+            <otherwise>rm.value ASC</otherwise>
+        </choose>
+        LIMIT #{filter.limit}
+    </select>
+
+</mapper>
