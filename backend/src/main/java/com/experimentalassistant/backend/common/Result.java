@@ -10,7 +10,7 @@ public class Result<T> {
 
     public static <T> Result<T> success(T data) {
         Result<T> result = new Result<>();
-        result.code = 200;
+        result.code = 0;
         result.message = "success";
         result.data = data;
         return result;
@@ -22,8 +22,8 @@ public class Result<T> {
 
     public static <T> Result<T> error(String message) {
         Result<T> result = new Result<>();
-        result.code = 500;
-        result.message = message;
+        result.code = 1;
+        result.message = message == null ? "error" : message;
         return result;
     }
 }

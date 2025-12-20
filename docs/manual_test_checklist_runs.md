@@ -40,3 +40,26 @@
 - [ ] Confirm warning dialog
 - [ ] Verify run is removed from list
 - [ ] Verify success message
+
+---
+
+## A2 Patch Manual Test Run (Run Dialog inline create)
+
+Date: 2025-12-20
+
+### Tag (P0)
+- [ ] Open Run Create/Edit dialog, tags load without blocking
+- [ ] Type a new tag, press Enter, tag is created and shown as a chip
+- [ ] Type an existing tag, press Enter, no duplicate created and chip is added
+- [ ] Remove a chip, tag is unselected (resource not deleted)
+- [ ] Same tag cannot be added twice as chips
+
+### MetricDef (P0)
+- [ ] When metric defs are empty, select shows guidance and `+ New Metric` button
+- [ ] Create MetricDef in popup, it appears in options and auto-selected on current row
+- [ ] Same Run cannot select duplicate metric definition IDs
+- [ ] Create/Update Run, detail drawer shows tags and metrics
+
+### Regression (P0)
+- [ ] Runs list, detail drawer, edit, delete still work
+- [ ] Dashboard remains stable with empty/low data

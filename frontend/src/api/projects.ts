@@ -7,17 +7,18 @@ export interface Project {
   description?: string
   createdAt?: string
   updatedAt?: string
+  runCount?: number | string // For UI display
 }
 
 export function getProjects(params: { page?: number; size?: number; q?: string }) {
   return request.get<any, ApiResponse<PageResult<Project>>>('/projects', { params })
 }
 
-export function createProject(data: Project) {
+export function createProject(data: { name: string; description?: string }) {
   return request.post<any, ApiResponse<Project>>('/projects', data)
 }
 
-export function updateProject(id: number, data: Project) {
+export function updateProject(id: number, data: { name: string; description?: string }) {
   return request.put<any, ApiResponse<Project>>(`/projects/${id}`, data)
 }
 

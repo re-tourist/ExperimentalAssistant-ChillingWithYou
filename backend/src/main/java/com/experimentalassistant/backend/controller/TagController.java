@@ -30,7 +30,33 @@ public class TagController {
 
     @PostMapping
     public Result<Tag> create(@RequestBody Tag tag) {
-        tagService.save(tag);
-        return Result.success(tag);
+        String name = tag == null ? null : tag.getName();
+        if (!StringUtils.hasText(name)) {
+            return Result.error("Tag name is required");
+        }
+        String normalized = name.trim();
+        if (normalized.length() > 32) {
+            return Result.error("Tag name length must be <= 32");
+        }
+
+        Tag existing = tagService.getOne(new LambdaQueryWrapper<Tag>()
+                .apply("LOWER(name) = {0}", normalized.toLowerCase()));
+        if (existing != null) {
+            return Result.success(existing);
+        }
+
+        Tag toSave = new Tag();
+        toSave.setName(normalized);
+        try {
+            tagService.save(toSave);
+            return Result.success(toSave);
+        } catch (Exception e) {
+            Tag after = tagService.getOne(new LambdaQueryWrapper<Tag>()
+                    .apply("LOWER(name) = {0}", normalized.toLowerCase()));
+            if (after != null) {
+                return Result.success(after);
+            }
+            return Result.error(e.getMessage());
+        }
     }
 }

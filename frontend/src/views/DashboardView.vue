@@ -238,6 +238,17 @@ const getStatusType = (status: string) => {
   }
 }
 
+const resetDashboardData = () => {
+  summary.value = {
+    totalRuns: 0,
+    runsLast7Days: 0,
+    successRate: 0
+  }
+  topRuns.value = []
+  trendChart?.clear()
+  distributionChart?.clear()
+}
+
 const handleDateChange = (val: [string, string] | null) => {
   if (val) {
     filters.dateFrom = val[0]
@@ -266,6 +277,10 @@ const fetchOptions = async () => {
     ])
     projects.value = pRes.data.records
     metricDefs.value = mRes.data
+
+    if (projects.value.length > 0 && filters.projectId == null) {
+      filters.projectId = projects.value[0].id
+    }
     
     // Set default metric if available
     if (metricDefs.value.length > 0) {
@@ -277,10 +292,21 @@ const fetchOptions = async () => {
 }
 
 const fetchDashboardData = () => {
+  if (!filters.projectId) {
+    resetDashboardData()
+    return
+  }
+
   fetchSummary()
-  fetchTrend()
   fetchDistribution()
-  fetchTopRuns()
+
+  if (filters.metricDefId) {
+    fetchTrend()
+    fetchTopRuns()
+  } else {
+    topRuns.value = []
+    trendChart?.clear()
+  }
 }
 
 const fetchSummary = async () => {
