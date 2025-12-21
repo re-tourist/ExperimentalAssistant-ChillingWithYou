@@ -32,13 +32,17 @@ public class RunController {
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
                                         @RequestParam(required = false) List<Long> tagIds) {
-        Page<Run> runPage = runService.listRuns(page, size, projectId, status, q, dateFrom, dateTo, tagIds);
-        return Result.success(new PageResult<>(
-                runPage.getRecords(),
-                runPage.getTotal(),
-                runPage.getCurrent(),
-                runPage.getSize()
-        ));
+        try {
+            Page<Run> runPage = runService.listRuns(page, size, projectId, status, q, dateFrom, dateTo, tagIds);
+            return Result.success(new PageResult<>(
+                    runPage.getRecords(),
+                    runPage.getTotal(),
+                    runPage.getCurrent(),
+                    runPage.getSize()
+            ));
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")

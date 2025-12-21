@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS run (
     epochs INT COMMENT 'Total Epochs',
     seed INT COMMENT 'Random Seed',
     note TEXT COMMENT 'Run Note',
+    template_id BIGINT COMMENT 'Template ID',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_project_id (project_id)
@@ -55,3 +56,60 @@ CREATE TABLE IF NOT EXISTS run_tag (
     UNIQUE KEY uk_run_tag (run_id, tag_id),
     INDEX idx_run_id (run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS template (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE COMMENT 'Template Name',
+    domain VARCHAR(32) DEFAULT 'general' COMMENT 'Domain',
+    description VARCHAR(255) COMMENT 'Description',
+    config_json TEXT COMMENT 'Configuration JSON',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS template_metric_def (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    template_id BIGINT NOT NULL,
+    metric_def_id BIGINT NOT NULL,
+    is_default TINYINT(1) DEFAULT 0 COMMENT 'Is Default',
+    sort_order INT DEFAULT 0 COMMENT 'Sort Order',
+    UNIQUE KEY uk_template_metric (template_id, metric_def_id),
+    INDEX idx_template_id (template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS template_tag (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    template_id BIGINT NOT NULL,
+    tag_id BIGINT NOT NULL,
+    is_default TINYINT(1) DEFAULT 0 COMMENT 'Is Default',
+    sort_order INT DEFAULT 0 COMMENT 'Sort Order',
+    UNIQUE KEY uk_template_tag (template_id, tag_id),
+    INDEX idx_template_id (template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS run_note (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id BIGINT NOT NULL COMMENT 'Run ID',
+    type VARCHAR(16) NOT NULL COMMENT 'Type: NOTE, CONCLUSION, AI_DRAFT',
+    title VARCHAR(128) NULL COMMENT 'Optional Title',
+    content_md MEDIUMTEXT NOT NULL COMMENT 'Markdown Content',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_run_id (run_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @sql_run_template_id :=
+    (SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'run'
+              AND column_name = 'template_id'
+        ),
+        'SELECT 1',
+        'ALTER TABLE run ADD COLUMN template_id BIGINT NULL COMMENT ''Template ID'''
+    ));
+PREPARE stmt_run_template_id FROM @sql_run_template_id;
+EXECUTE stmt_run_template_id;
+DEALLOCATE PREPARE stmt_run_template_id;

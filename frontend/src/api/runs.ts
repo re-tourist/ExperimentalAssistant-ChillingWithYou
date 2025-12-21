@@ -19,6 +19,8 @@ export interface RunDetail extends Run {
   epochs?: number
   seed?: number
   note?: string
+  templateId?: number
+  templateName?: string
   metrics: { metricDefId: number; name?: string; displayName?: string; direction?: string; value: number }[]
   tags: { id: number; name: string }[]
 }
@@ -35,6 +37,7 @@ export interface RunCreateUpdate {
   epochs?: number
   seed?: number
   note?: string
+  templateId?: number
   metrics?: { metricDefId: number; value: number }[]
   tagIds?: number[]
 }

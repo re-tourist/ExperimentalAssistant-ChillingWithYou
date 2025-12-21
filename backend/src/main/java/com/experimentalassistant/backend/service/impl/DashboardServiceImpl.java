@@ -47,8 +47,13 @@ public class DashboardServiceImpl implements DashboardService {
             response.setSuccessRate(0.0);
         }
 
-        DashboardSummaryResponse.BestMetric bestMetric = dashboardMapper.getBestMetric(filter);
-        response.setBestMetric(bestMetric);
+        if (filter.getMetricDefId() != null) {
+            ensureMetricInfo(filter);
+            DashboardSummaryResponse.BestMetric bestMetric = dashboardMapper.getBestMetric(filter);
+            response.setBestMetric(bestMetric);
+        } else {
+            response.setBestMetric(null);
+        }
 
         return response;
     }

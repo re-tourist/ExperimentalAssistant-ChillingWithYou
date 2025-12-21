@@ -30,12 +30,14 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements RunSe
     private final RunTagMapper runTagMapper;
     private final MetricDefMapper metricDefMapper;
     private final TagMapper tagMapper;
+    private final TemplateMapper templateMapper;
 
-    public RunServiceImpl(RunMetricMapper runMetricMapper, RunTagMapper runTagMapper, MetricDefMapper metricDefMapper, TagMapper tagMapper) {
+    public RunServiceImpl(RunMetricMapper runMetricMapper, RunTagMapper runTagMapper, MetricDefMapper metricDefMapper, TagMapper tagMapper, TemplateMapper templateMapper) {
         this.runMetricMapper = runMetricMapper;
         this.runTagMapper = runTagMapper;
         this.metricDefMapper = metricDefMapper;
         this.tagMapper = tagMapper;
+        this.templateMapper = templateMapper;
     }
 
     @Override
@@ -95,6 +97,13 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements RunSe
 
         RunDetailResponse response = new RunDetailResponse();
         BeanUtils.copyProperties(run, response);
+        
+        if (run.getTemplateId() != null) {
+            Template template = templateMapper.selectById(run.getTemplateId());
+            if (template != null) {
+                response.setTemplateName(template.getName());
+            }
+        }
 
         // Fetch Metrics
         List<RunMetric> runMetrics = runMetricMapper.selectList(new LambdaQueryWrapper<RunMetric>().eq(RunMetric::getRunId, id));
@@ -156,11 +165,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements RunSe
 
         // Tag filtering logic
         if (!CollectionUtils.isEmpty(tagIds)) {
-            // Find runs that have ANY of the tags (or ALL? usually filtering implies containing the tag)
-            // If multiple tags are selected, usually it's OR or AND. Let's assume OR for now, or check requirement.
-            // Requirement says "Distribution by... tag". Filter "tagIds". Usually means "has one of these tags".
-            // A subquery is easiest here.
-            // select run_id from run_tag where tag_id in (...)
             List<RunTag> matchingRunTags = runTagMapper.selectList(new LambdaQueryWrapper<RunTag>().in(RunTag::getTagId, tagIds));
             if (matchingRunTags.isEmpty()) {
                 return new Page<>(page, size); // Return empty if filtering by tags and no runs found

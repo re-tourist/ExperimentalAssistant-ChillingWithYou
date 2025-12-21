@@ -8,22 +8,14 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("run")
-public class Run {
+@TableName("template")
+public class Template {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long projectId;
     private String name;
-    private String status; // RUNNING, FINISHED, FAILED
-    private String modelName;
-    private String datasetName;
-    private String optimizer;
-    private Double lr;
-    private Integer batchSize;
-    private Integer epochs;
-    private Integer seed;
-    private String note;
-    private Long templateId;
+    private String domain;
+    private String description;
+    private String configJson;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -41,13 +41,18 @@
             rm.metric_def_id as metricDefId,
             md.name as metricName,
             rm.value as value,
-            r.id as runId
+            r.id as runId,
+            r.name as runName
         FROM run r
         JOIN run_metric rm ON r.id = rm.run_id
         JOIN metric_def md ON rm.metric_def_id = md.id
         <include refid="commonWhere"/>
+        AND rm.metric_def_id = #{filter.metricDefId}
         ORDER BY
-            CASE WHEN md.direction = 'MAX' THEN rm.value ELSE -rm.value END DESC
+        <choose>
+            <when test="filter.direction == 'MAX'">rm.value DESC</when>
+            <otherwise>rm.value ASC</otherwise>
+        </choose>
         LIMIT 1
     </select>
 

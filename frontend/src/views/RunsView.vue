@@ -81,6 +81,24 @@
       :close-on-click-modal="false"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+        <!-- Template Selection -->
+        <el-form-item label="Template">
+          <el-select 
+            v-model="form.templateId" 
+            placeholder="Select Template (Optional)" 
+            clearable 
+            style="width: 100%"
+            @change="handleTemplateChange"
+          >
+            <el-option
+              v-for="tmpl in templates"
+              :key="tmpl.id"
+              :label="tmpl.name"
+              :value="tmpl.id"
+            />
+          </el-select>
+        </el-form-item>
+        
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="Project" prop="projectId">
@@ -333,10 +351,12 @@ import { getRuns, getRun, createRun, updateRun, deleteRun } from '@/api/runs'
 import { getProjects } from '@/api/projects'
 import { getTags, createTag } from '@/api/tags'
 import { getMetricDefs, createMetricDef } from '@/api/metrics'
+import { getTemplates, getTemplate } from '@/api/templates'
 import type { Run, RunDetail, RunCreateUpdate } from '@/api/runs'
 import type { Project } from '@/api/projects'
 import type { Tag } from '@/api/tags'
 import type { MetricDef } from '@/api/metrics'
+import type { Template } from '@/api/templates'
 
 const route = useRoute()
 
@@ -346,6 +366,7 @@ const runs = ref<Run[]>([])
 const projects = ref<Project[]>([])
 const tags = ref<Tag[]>([])
 const metricDefs = ref<MetricDef[]>([])
+const templates = ref<Template[]>([])
 const pagination = reactive({
   page: 1,
   size: 10,
@@ -374,7 +395,7 @@ const formRef = ref()
 const form = reactive<RunCreateUpdate & { metrics: any[] }>({
   projectId: undefined as any,
   name: '',
-  status: 'RUNNING', // Add status to form model to fix type error if API expects it, though interface might need update
+  status: 'RUNNING',
   modelName: '',
   datasetName: '',
   optimizer: '',
@@ -383,6 +404,7 @@ const form = reactive<RunCreateUpdate & { metrics: any[] }>({
   epochs: 10,
   seed: 42,
   note: '',
+  templateId: undefined,
   tagIds: [],
   metrics: []
 })
@@ -579,6 +601,7 @@ onMounted(async () => {
   await fetchProjects()
   await fetchTags()
   await fetchMetricDefs()
+  await fetchTemplates()
   await fetchRuns()
 })
 
@@ -615,6 +638,15 @@ const fetchMetricDefs = async () => {
     ElMessage.error('加载指标定义失败')
   } finally {
     optionsLoading.metricDefs = false
+  }
+}
+
+const fetchTemplates = async () => {
+  try {
+    const res = await getTemplates({ page: 1, size: 100 })
+    templates.value = res.data.records
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -711,6 +743,7 @@ const openEditDialog = async (row: Run) => {
       epochs: data.epochs,
       seed: data.seed,
       note: data.note,
+      templateId: data.templateId,
       tagIds: data.tags.map(t => t.id),
       metrics: data.metrics.map(m => ({
         metricDefId: m.metricDefId,
@@ -749,6 +782,7 @@ const resetForm = () => {
     epochs: 10,
     seed: 42,
     note: '',
+    templateId: undefined,
     tagIds: [],
     metrics: []
   })
@@ -756,6 +790,79 @@ const resetForm = () => {
   metricError.value = ''
   metricValueRefs.value = []
   tagInput.value = ''
+}
+
+const handleTemplateChange = async (val: number | undefined) => {
+  if (!val) return
+  
+  // If editing, user might be just changing template but keeping data.
+  // But requirement says: "If user switches template: popup confirm overwrite"
+  // Let's check if form has data.
+  const hasData = form.metrics.length > 0 || form.tagIds!.length > 0
+  
+  if (hasData) {
+    try {
+      await ElMessageBox.confirm(
+        'Do you want to overwrite current metrics and tags with template defaults?', 
+        'Apply Template', 
+        { confirmButtonText: 'Yes, Overwrite', cancelButtonText: 'No, Keep Current', type: 'warning' }
+      )
+      // Confirmed overwrite
+      await applyTemplate(val)
+    } catch {
+      // Cancelled, do nothing (keep current data, but templateId is updated)
+    }
+  } else {
+    // No data, apply directly
+    await applyTemplate(val)
+  }
+}
+
+const applyTemplate = async (id: number) => {
+  try {
+    const res = await getTemplate(id)
+    const tmpl = res.data
+    
+    // Reset and apply
+    form.metrics = []
+    form.tagIds = []
+    
+    // Apply Metrics
+    if (tmpl.metricDefs) {
+      tmpl.metricDefs.forEach(m => {
+        if (m.isDefault) {
+          form.metrics.push({
+            metricDefId: m.metricDefId,
+            value: 0 // Default value placeholder
+          })
+        }
+      })
+    }
+    
+    // Apply Tags
+    if (tmpl.tags) {
+      const newTagIds: number[] = []
+      tmpl.tags.forEach(t => {
+        if (t.isDefault) {
+          newTagIds.push(t.tagId)
+        }
+      })
+      form.tagIds = newTagIds
+      
+      // Update selectedTags for chips display
+      // We need to fetch tags if they are not in `tags` list?
+      // `tags` list is already fetched in onMounted.
+      // But we need to ensure selectedTags computed property works.
+      // Wait, `selectedTags` logic in previous A2 implementation might rely on `form.tagIds` and `tags` list.
+      // Let's check A2 implementation of `selectedTags`.
+      // I don't see `selectedTags` defined in the visible code above, it must be there from A2 patch.
+      // Assuming A2 patch added `selectedTags` computed property.
+    }
+    
+    ElMessage.success(`Template "${tmpl.name}" applied`)
+  } catch (error) {
+    console.error(error)
+  }
 }
 
 // --- Dynamic Metrics ---

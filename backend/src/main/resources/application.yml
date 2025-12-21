@@ -6,12 +6,12 @@ spring:
     name: backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/experimental_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=UTC
+    url: ${DB_URL:jdbc:mysql://localhost:3306/experimental_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=UTC}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:password}
   sql:
     init:
-      mode: always
+      mode: ${DB_INIT_MODE:always}
       schema-locations: classpath:sql/schema.sql
 
 mybatis-plus:
@@ -19,3 +19,11 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   mapper-locations: classpath:mapper/*.xml
+
+ai:
+  provider: ${AI_PROVIDER:mock} # mock | http
+  http:
+    base-url: ${AI_HTTP_BASE_URL:http://localhost:5000}
+    api-key: ${AI_HTTP_API_KEY:}
+    timeout-ms: ${AI_HTTP_TIMEOUT_MS:5000}
+    model: ${AI_HTTP_MODEL:default}

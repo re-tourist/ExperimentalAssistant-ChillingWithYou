@@ -20,6 +20,10 @@
           <el-icon><DataLine /></el-icon>
           <span>Runs</span>
         </el-menu-item>
+        <el-menu-item index="/management">
+          <el-icon><Setting /></el-icon>
+          <span>Management</span>
+        </el-menu-item>
         <el-menu-item index="/about">
           <el-icon><InfoFilled /></el-icon>
           <span>About</span>

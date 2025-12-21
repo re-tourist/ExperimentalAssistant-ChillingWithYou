@@ -16,6 +16,7 @@ public class RunCreateUpdateRequest {
     private Integer epochs;
     private Integer seed;
     private String note;
+    private Long templateId;
     private List<Long> tagIds;
     private List<Metric> metrics;
 

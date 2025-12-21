@@ -15,5 +15,6 @@ public class DashboardSummaryResponse {
         private String metricName;
         private Double value;
         private Long runId;
+        private String runName;
     }
 }
