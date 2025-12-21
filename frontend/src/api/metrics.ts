@@ -17,3 +17,11 @@ export function getMetricDefs() {
 export function createMetricDef(data: MetricDef) {
   return request.post<any, ApiResponse<MetricDef>>('/metrics/defs', data)
 }
+
+export function updateMetricDef(id: number, data: MetricDef) {
+  return request.put<any, ApiResponse<MetricDef>>(`/metrics/defs/${id}`, data)
+}
+
+export function deleteMetricDef(id: number) {
+  return request.delete<any, ApiResponse<void>>(`/metrics/defs/${id}`)
+}

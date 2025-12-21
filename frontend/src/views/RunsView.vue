@@ -290,55 +290,10 @@
     </el-dialog>
 
     <!-- Detail Drawer -->
-    <el-drawer
+    <RunDetailDrawer
       v-model="drawerVisible"
-      title="Run Details"
-      size="50%"
-    >
-      <div v-if="currentRun" class="run-detail">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="ID">{{ currentRun.id }}</el-descriptions-item>
-          <el-descriptions-item label="Name">{{ currentRun.name }}</el-descriptions-item>
-          <el-descriptions-item label="Project ID">{{ currentRun.projectId }}</el-descriptions-item>
-          <el-descriptions-item label="Status">
-             <el-tag :type="getStatusType(currentRun.status)">{{ currentRun.status }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="Model">{{ currentRun.modelName }}</el-descriptions-item>
-          <el-descriptions-item label="Dataset">{{ currentRun.datasetName }}</el-descriptions-item>
-          <el-descriptions-item label="Optimizer">{{ currentRun.optimizer }}</el-descriptions-item>
-          <el-descriptions-item label="Learning Rate">{{ currentRun.lr }}</el-descriptions-item>
-          <el-descriptions-item label="Batch Size">{{ currentRun.batchSize }}</el-descriptions-item>
-          <el-descriptions-item label="Epochs">{{ currentRun.epochs }}</el-descriptions-item>
-          <el-descriptions-item label="Seed">{{ currentRun.seed }}</el-descriptions-item>
-          <el-descriptions-item label="Created At">{{ formatDateTime(currentRun.createdAt) }}</el-descriptions-item>
-        </el-descriptions>
-        
-        <div class="detail-section">
-           <h3>Note</h3>
-           <p>{{ currentRun.note || 'No note provided.' }}</p>
-        </div>
-
-        <div class="detail-section">
-           <h3>Tags</h3>
-           <div class="tags-list">
-              <el-tag v-for="tag in currentRun.tags" :key="tag.id" class="mr-2">{{ tag.name }}</el-tag>
-              <span v-if="!currentRun.tags?.length">No tags.</span>
-           </div>
-        </div>
-
-        <div class="detail-section">
-           <h3>Metrics</h3>
-           <el-table :data="currentRun.metrics" border stripe>
-              <el-table-column label="Metric">
-                <template #default="{ row }">
-                  {{ row.displayName || row.name || '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="value" label="Value" />
-           </el-table>
-        </div>
-      </div>
-    </el-drawer>
+      v-model:runId="currentRunId"
+    />
   </div>
 </template>
 
@@ -352,7 +307,8 @@ import { getProjects } from '@/api/projects'
 import { getTags, createTag } from '@/api/tags'
 import { getMetricDefs, createMetricDef } from '@/api/metrics'
 import { getTemplates, getTemplate } from '@/api/templates'
-import type { Run, RunDetail, RunCreateUpdate } from '@/api/runs'
+import RunDetailDrawer from '@/views/runs/RunDetailDrawer.vue'
+import type { Run, RunCreateUpdate } from '@/api/runs'
 import type { Project } from '@/api/projects'
 import type { Tag } from '@/api/tags'
 import type { MetricDef } from '@/api/metrics'
@@ -383,7 +339,6 @@ const drawerVisible = ref(false)
 const submitting = ref(false)
 const isEdit = ref(false)
 const currentRunId = ref<number | null>(null)
-const currentRun = ref<RunDetail | null>(null)
 
 const optionsLoading = reactive({
   tags: false,
@@ -704,13 +659,8 @@ const formatDateTime = (val: string) => {
 
 // --- Detail Drawer ---
 const handleRowClick = async (row: Run) => {
-  try {
-    const res = await getRun(row.id)
-    currentRun.value = res.data
-    drawerVisible.value = true
-  } catch (error) {
-    console.error(error)
-  }
+  currentRunId.value = row.id
+  drawerVisible.value = true
 }
 
 // --- Create/Edit Dialog ---
