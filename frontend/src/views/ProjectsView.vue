@@ -261,7 +261,7 @@ const formatDateTime = (val?: string) => {
 const goToRuns = (row: Project) => {
   if (!row.id) return
   router.push({ 
-    name: 'Runs', 
+    name: 'runs', 
     query: { projectId: String(row.id) } 
   })
 }

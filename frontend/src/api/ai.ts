@@ -20,9 +20,9 @@ export interface AiDraftResponse {
 }
 
 export const generateRunDraft = (data: AiDraftRequest) => {
-  return request.post<any, ApiResponse<AiDraftResponse>>('/api/ai/run-draft', data)
+  return request.post<any, ApiResponse<AiDraftResponse>>('/ai/run-draft', data)
 }
 
 export const parseMarkdownRefs = (textMd: string) => {
-  return request.post<any, ApiResponse<number[]>>('/api/markdown/refs', { textMd })
+  return request.post<any, ApiResponse<number[]>>('/markdown/refs', { textMd })
 }

@@ -28,27 +28,27 @@ export interface RunConclusionResponse {
 }
 
 export const getNotes = (runId: number, type?: string) => {
-  return request.get<any, ApiResponse<RunNote[]>>(`/api/runs/${runId}/notes`, {
+  return request.get<any, ApiResponse<RunNote[]>>(`/runs/${runId}/notes`, {
     params: { type }
   })
 }
 
 export const createNote = (runId: number, data: RunNoteCreate) => {
-  return request.post<any, ApiResponse<RunNote>>(`/api/runs/${runId}/notes`, data)
+  return request.post<any, ApiResponse<RunNote>>(`/runs/${runId}/notes`, data)
 }
 
 export const updateNote = (runId: number, noteId: number, data: RunNoteUpdate) => {
-  return request.put<any, ApiResponse<RunNote>>(`/api/runs/${runId}/notes/${noteId}`, data)
+  return request.put<any, ApiResponse<RunNote>>(`/runs/${runId}/notes/${noteId}`, data)
 }
 
 export const deleteNote = (runId: number, noteId: number) => {
-  return request.delete<any, ApiResponse<void>>(`/api/runs/${runId}/notes/${noteId}`)
+  return request.delete<any, ApiResponse<void>>(`/runs/${runId}/notes/${noteId}`)
 }
 
 export const getConclusion = (runId: number) => {
-  return request.get<any, ApiResponse<RunConclusionResponse>>(`/api/runs/${runId}/conclusion`)
+  return request.get<any, ApiResponse<RunConclusionResponse>>(`/runs/${runId}/conclusion`)
 }
 
 export const upsertConclusion = (runId: number, data: RunNoteUpdate) => {
-  return request.put<any, ApiResponse<RunNote>>(`/api/runs/${runId}/conclusion`, data)
+  return request.put<any, ApiResponse<RunNote>>(`/runs/${runId}/conclusion`, data)
 }
