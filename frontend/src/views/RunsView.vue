@@ -298,7 +298,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
@@ -605,6 +605,12 @@ const fetchTemplates = async () => {
   }
 }
 
+import { useAiStore } from '@/stores/aiAssistant'
+
+const aiStore = useAiStore()
+
+// ...
+
 const fetchRuns = async () => {
   loading.value = true
   try {
@@ -617,10 +623,70 @@ const fetchRuns = async () => {
     })
     runs.value = res.data.records
     pagination.total = res.data.total
+    
+    // Sync to AI Store (Runs Context)
+    updateAiContext()
+    
   } finally {
     loading.value = false
   }
 }
+
+// ...
+
+const updateAiContext = () => {
+  // Sync available runs
+  // Note: we might want to map Run -> AiContextRun structure
+  // Current Run interface: { id, name, status, tags, metrics ... }
+  // We need to fetch full details? Usually list endpoint returns simplified data.
+  // Requirement says: "Runs node supports: Multi-select, Search, Only display current page or last N"
+  // So we can just use the current 'runs' list.
+  // We might miss metrics/hyperparams if list doesn't have them.
+  // Let's assume list has basic info, and if user selects, we might need more details.
+  // But for Context Tree display, list info is enough. 
+  // Backend AI context might need more.
+  // If backend needs more, we might need to fetch details for selected runs before analyzing.
+  // Phase 1 simplification: Use what we have in list. 
+  // Actually, getRuns list usually doesn't return full metrics map.
+  // Let's map what we can.
+  
+  const mappedRuns = runs.value.map(r => ({
+      run_id: r.id,
+      name: r.name,
+      status: r.status,
+      tags: [], // List might not have tags? Check interface. Interface has 'tags' in RunDetail but not Run?
+                // Interface Run: id, projectId, name, status, modelName, datasetName, createdAt...
+                // Interface RunDetail extends Run: + metrics, tags...
+                // So Run list item might NOT have tags/metrics.
+                // We might need to fetch details if we want rich context.
+                // Or just pass basic info.
+      metrics: {},
+      hyperparameters: {
+          model: r.modelName,
+          dataset: r.datasetName
+      }
+  }))
+  
+  aiStore.setAvailableRuns(mappedRuns)
+  
+  // Also sync project context if filtered
+  if (filters.projectId) {
+      const currentProj = projects.value.find(p => p.id === filters.projectId)
+      if (currentProj) {
+          aiStore.setProjectContext({
+              id: currentProj.id,
+              name: currentProj.name,
+              description: currentProj.description
+          })
+      }
+  }
+}
+
+// Watch changes
+watch(() => runs.value, () => {
+    updateAiContext()
+})
+
 
 // --- Actions ---
 const handleFilter = () => {

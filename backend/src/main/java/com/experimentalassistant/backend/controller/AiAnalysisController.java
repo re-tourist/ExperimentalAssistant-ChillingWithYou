@@ -7,6 +7,9 @@ import com.experimentalassistant.backend.service.AiAnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import com.experimentalassistant.backend.dto.AiAnalysisRequest;
+import com.experimentalassistant.backend.dto.AiAnalysisResponse;
+
 @RestController
 @RequestMapping("/api/ai")
 public class AiAnalysisController {
@@ -24,6 +27,19 @@ public class AiAnalysisController {
             return Result.success(response);
         } catch (Exception e) {
             return Result.error("AI Draft generation failed: " + e.getMessage());
+        }
+    }
+    
+    @PostMapping("/analyze")
+    public Result<AiAnalysisResponse> analyze(@RequestBody AiAnalysisRequest request) {
+        if (request.getContextJson() == null || request.getContextJson().isEmpty()) {
+            return Result.error("contextJson is required");
+        }
+        try {
+            AiAnalysisResponse response = aiAnalysisService.analyze(request);
+            return Result.success(response);
+        } catch (Exception e) {
+            return Result.error("AI Analysis failed: " + e.getMessage());
         }
     }
 }
