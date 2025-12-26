@@ -38,7 +38,7 @@
           <span>Experiment Tracking System</span>
         </div>
         <div class="header-actions">
-           <el-button type="primary" plain @click="openAiAssistant">
+           <el-button v-if="aiStore.aiEnabled" type="primary" plain @click="openAiAssistant">
              <el-icon><ChatDotSquare /></el-icon> AI Assistant
            </el-button>
         </div>

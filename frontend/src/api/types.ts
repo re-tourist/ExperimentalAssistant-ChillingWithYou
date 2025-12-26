@@ -4,6 +4,12 @@ export interface ApiResponse<T = any> {
   data: T
 }
 
+export interface SystemConfig {
+  aiEnabled: boolean
+  aiProvider: string
+  aiModel?: string
+}
+
 export interface PageResult<T> {
   records: T[]
   total: number

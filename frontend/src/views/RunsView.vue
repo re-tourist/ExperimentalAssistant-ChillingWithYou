@@ -31,6 +31,12 @@
       </el-form>
     </div>
 
+    <ActiveFilters
+      v-model:filters="filters"
+      :config="filterConfig"
+      @change="handleFiltersChange"
+    />
+
     <!-- Runs List Table -->
     <el-table
       v-loading="loading"
@@ -81,23 +87,6 @@
       :close-on-click-modal="false"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
-        <!-- Template Selection -->
-        <el-form-item label="Template">
-          <el-select 
-            v-model="form.templateId" 
-            placeholder="Select Template (Optional)" 
-            clearable 
-            style="width: 100%"
-            @change="handleTemplateChange"
-          >
-            <el-option
-              v-for="tmpl in templates"
-              :key="tmpl.id"
-              :label="tmpl.name"
-              :value="tmpl.id"
-            />
-          </el-select>
-        </el-form-item>
         
         <el-row :gutter="20">
           <el-col :span="12">
@@ -308,6 +297,7 @@ import { getTags, createTag } from '@/api/tags'
 import { getMetricDefs, createMetricDef } from '@/api/metrics'
 import { getTemplates, getTemplate } from '@/api/templates'
 import RunDetailDrawer from '@/views/runs/RunDetailDrawer.vue'
+import ActiveFilters from '@/components/ActiveFilters.vue'
 import type { Run, RunCreateUpdate } from '@/api/runs'
 import type { Project } from '@/api/projects'
 import type { Tag } from '@/api/tags'
@@ -334,6 +324,19 @@ const filters = reactive({
   q: undefined as string | undefined
 })
 
+const filterConfig = {
+  projectId: { 
+    label: 'Project',
+    formatter: (val: number) => projects.value.find(p => p.id === val)?.name || String(val)
+  },
+  status: { label: 'Status' },
+  q: { label: 'Search' }
+}
+
+const handleFiltersChange = () => {
+  handleFilter()
+}
+
 const dialogVisible = ref(false)
 const drawerVisible = ref(false)
 const submitting = ref(false)
@@ -359,7 +362,7 @@ const form = reactive<RunCreateUpdate & { metrics: any[] }>({
   epochs: 10,
   seed: 42,
   note: '',
-  templateId: undefined,
+  // templateId: undefined, // Removed
   tagIds: [],
   metrics: []
 })
@@ -759,7 +762,7 @@ const openEditDialog = async (row: Run) => {
       epochs: data.epochs,
       seed: data.seed,
       note: data.note,
-      templateId: data.templateId,
+      // templateId: data.templateId,
       tagIds: data.tags.map(t => t.id),
       metrics: data.metrics.map(m => ({
         metricDefId: m.metricDefId,
@@ -798,7 +801,7 @@ const resetForm = () => {
     epochs: 10,
     seed: 42,
     note: '',
-    templateId: undefined,
+    // templateId: undefined,
     tagIds: [],
     metrics: []
   })

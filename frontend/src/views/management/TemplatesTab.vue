@@ -3,10 +3,12 @@
     <div class="filter-bar">
       <el-input v-model="filters.q" placeholder="Search Templates" style="width: 200px; margin-right: 10px" @keyup.enter="fetchData" />
       <el-select v-model="filters.domain" placeholder="Domain" clearable style="width: 150px; margin-right: 10px" @change="fetchData">
-        <el-option label="Deep Learning" value="deep-learning" />
+        <el-option label="Classification" value="classification" />
+        <el-option label="Regression" value="regression" />
+        <el-option label="Clustering" value="clustering" />
         <el-option label="NLP" value="nlp" />
-        <el-option label="Simulation" value="simulation" />
-        <el-option label="General" value="general" />
+        <el-option label="CV" value="cv" />
+        <el-option label="Custom" value="custom" />
       </el-select>
       <el-button type="primary" @click="fetchData">Search</el-button>
       <el-button type="success" @click="openCreateDialog">New Template</el-button>
@@ -16,7 +18,8 @@
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="Name" min-width="150" />
       <el-table-column prop="domain" label="Domain" width="120">
-        <template #default="{ row }">
+        <template #default="{ row   domain: [{ required: true, message: 'Please select domain', trigger: 'change' }]
+}">
           <el-tag>{{ row.domain }}</el-tag>
         </template>
       </el-table-column>
@@ -52,10 +55,12 @@
           <el-col :span="12">
             <el-form-item label="Domain" prop="domain">
               <el-select v-model="form.domain" style="width: 100%">
-                <el-option label="Deep Learning" value="deep-learning" />
+                <el-option label="Classification" value="classification" />
+                <el-option label="Regression" value="regression" />
+                <el-option label="Clustering" value="clustering" />
                 <el-option label="NLP" value="nlp" />
-                <el-option label="Simulation" value="simulation" />
-                <el-option label="General" value="general" />
+                <el-option label="CV" value="cv" />
+                <el-option label="Custom" value="custom" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -226,7 +231,8 @@ const form = reactive<TemplateUpsertRequest>({
 })
 
 const rules = {
-  name: [{ required: true, message: 'Please enter name', trigger: 'blur' }]
+  name: [{ required: true, message: 'Please enter name', trigger: 'blur' }],
+  domain: [{ required: true, message: 'Please select domain', trigger: 'change' }]
 }
 
 // Options

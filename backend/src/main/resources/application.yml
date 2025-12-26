@@ -12,7 +12,7 @@ spring:
   sql:
     init:
       mode: ${DB_INIT_MODE:always}
-      schema-locations: classpath:sql/schema.sql
+      schema-locations: classpath:sql/schema.sql,classpath:sql/schema_patch_v2.sql
 
 mybatis-plus:
   configuration:

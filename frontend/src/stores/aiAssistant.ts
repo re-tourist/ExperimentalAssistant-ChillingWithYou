@@ -61,8 +61,12 @@ export const useAiStore = defineStore('ai', () => {
   const lastAnalysis = ref<string>('')
   const userIntent = ref('')
 
+  // Feature Flag
+  const aiEnabled = ref(false) // Default disabled until config loaded or logic implemented
+
   // Actions
   const openDrawer = (initialMode: 'dashboard' | 'runs' | 'detail' = 'dashboard') => {
+    if (!aiEnabled.value) return // Prevent opening if disabled
     drawerVisible.value = true
     
     // Set default selections based on mode
@@ -159,6 +163,7 @@ export const useAiStore = defineStore('ai', () => {
     selection,
     lastAnalysis,
     userIntent,
+    aiEnabled,
     finalContextJson,
     openDrawer,
     closeDrawer,

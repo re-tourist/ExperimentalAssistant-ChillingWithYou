@@ -14,6 +14,8 @@ public class Project {
     private Long id;
     private String name;
     private String description;
+    private Long templateId;
+    private String projectConfigSnapshot;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

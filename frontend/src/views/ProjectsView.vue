@@ -123,6 +123,19 @@
             :rows="3"
           />
         </el-form-item>
+        <el-form-item label="Template" prop="templateId">
+          <el-select v-model="form.templateId" placeholder="Select a template (Optional)" clearable style="width: 100%">
+            <el-option
+              v-for="item in templates"
+              :key="item.id"
+              :label="item.name + (item.domain ? ` (${item.domain})` : '')"
+              :value="item.id"
+            />
+          </el-select>
+          <div v-if="isEdit && form.templateId" class="form-tip">
+             Warning: Changing template will update the snapshot but won't affect existing runs.
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -143,6 +156,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Refresh } from '@element-plus/icons-vue'
 import { getProjects, createProject, updateProject, deleteProject, type Project } from '@/api/projects'
 import { getRuns } from '@/api/runs'
+import { getTemplates, type Template } from '@/api/templates'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
@@ -167,8 +181,11 @@ const formRef = ref<FormInstance>()
 
 const form = reactive({
   name: '',
-  description: ''
+  description: '',
+  templateId: undefined as number | undefined
 })
+
+const templates = ref<Template[]>([])
 
 const rules = reactive<FormRules>({
   name: [
@@ -267,24 +284,37 @@ const goToRuns = (row: Project) => {
 }
 
 // --- Dialog & CRUD ---
-const openCreateDialog = () => {
+const openCreateDialog = async () => {
   isEdit.value = false
   currentId.value = null
   resetForm()
   dialogVisible.value = true
+  // Fetch templates for dropdown
+  try {
+    const res = await getTemplates({ page: 1, size: 100 })
+    templates.value = res.data.records
+  } catch (e) { console.error(e) }
 }
 
-const openEditDialog = (row: Project) => {
+const openEditDialog = async (row: Project) => {
   isEdit.value = true
   currentId.value = row.id || null
   form.name = row.name
   form.description = row.description || ''
+  // @ts-ignore
+  form.templateId = row.templateId
+  
   dialogVisible.value = true
+  try {
+    const res = await getTemplates({ page: 1, size: 100 })
+    templates.value = res.data.records
+  } catch (e) { console.error(e) }
 }
 
 const resetForm = () => {
   form.name = ''
   form.description = ''
+  form.templateId = undefined
   if (formRef.value) formRef.value.resetFields()
 }
 
@@ -341,6 +371,12 @@ const handleDelete = (row: Project) => {
 </script>
 
 <style scoped>
+.form-tip {
+  font-size: 12px;
+  color: #e6a23c;
+  line-height: 1.5;
+  margin-top: 5px;
+}
 .projects-container {
   padding: 20px;
 }

@@ -8,6 +8,14 @@ export interface Project {
   createdAt?: string
   updatedAt?: string
   runCount?: number | string // For UI display
+  templateId?: number
+  projectConfigSnapshot?: string
+}
+
+export interface ProjectCreateUpdate {
+  name: string
+  description?: string
+  templateId?: number
 }
 
 export function getProjects(params: { page?: number; size?: number; q?: string }) {
