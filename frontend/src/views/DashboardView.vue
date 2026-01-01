@@ -169,7 +169,7 @@
             <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="Created At" />
+        <el-table-column prop="endTime" label="End Time" />
       </el-table>
     </el-card>
   </div>

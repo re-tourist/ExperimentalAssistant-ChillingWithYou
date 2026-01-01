@@ -47,8 +47,13 @@ public class DashboardServiceImpl implements DashboardService {
             response.setSuccessRate(0.0);
         }
 
-        DashboardSummaryResponse.BestMetric bestMetric = dashboardMapper.getBestMetric(filter);
-        response.setBestMetric(bestMetric);
+        if (filter.getMetricDefId() != null) {
+            ensureMetricInfo(filter);
+            DashboardSummaryResponse.BestMetric bestMetric = dashboardMapper.getBestMetric(filter);
+            response.setBestMetric(bestMetric);
+        } else {
+            response.setBestMetric(null);
+        }
 
         return response;
     }
@@ -63,6 +68,11 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<DashboardDistributionItem> getDistribution(DashboardFilter filter) {
         ensureProjectId(filter);
+        String distributionBy = filter.getDistributionBy();
+        if (distributionBy != null && distributionBy.startsWith("field:")) {
+            String fieldKey = distributionBy.substring("field:".length());
+            return dashboardMapper.getDistributionByField(filter, fieldKey);
+        }
         return dashboardMapper.getDistribution(filter);
     }
 
@@ -89,6 +99,9 @@ public class DashboardServiceImpl implements DashboardService {
         MetricDef metricDef = metricDefMapper.selectById(filter.getMetricDefId());
         if (metricDef == null) {
             throw new IllegalArgumentException("Invalid Metric Definition ID: " + filter.getMetricDefId());
+        }
+        if ("NONE".equalsIgnoreCase(metricDef.getDirection())) {
+            throw new IllegalArgumentException("Metric has no direction (NONE), cannot compute best/top");
         }
         filter.setDirection(metricDef.getDirection());
     }
