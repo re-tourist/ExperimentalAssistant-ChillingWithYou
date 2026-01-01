@@ -32,8 +32,14 @@ public class ProjectTemplateBackfillRunner implements CommandLineRunner {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void run(String... args) {
-        Template defaultTemplate = templateMapper.selectOne(new LambdaQueryWrapper<Template>()
-                .eq(Template::getIsDefault, true));
+        Template defaultTemplate;
+        try {
+            defaultTemplate = templateMapper.selectOne(new LambdaQueryWrapper<Template>()
+                    .eq(Template::getIsDefault, true));
+        } catch (Exception e) {
+            log.info("Skip project template backfill: {}", e.getMessage());
+            return;
+        }
         if (defaultTemplate == null) {
             log.info("No default template found, skip project template backfill.");
             return;
