@@ -32,6 +32,12 @@
         </div>
       </div>
 
+      <ActiveFilters
+        v-model:filters="filters"
+        :config="filterConfig"
+        @change="handleFiltersChange"
+      />
+
       <!-- Table -->
       <el-table
         v-loading="loading"
@@ -123,6 +129,19 @@
             :rows="3"
           />
         </el-form-item>
+        <el-form-item label="Template" prop="templateId">
+          <el-select v-model="form.templateId" placeholder="Select a template" style="width: 100%">
+            <el-option
+              v-for="item in templates"
+              :key="item.id"
+              :label="item.name + (item.domain ? ` (${item.domain})` : '')"
+              :value="item.id"
+            />
+          </el-select>
+          <div v-if="isEdit && form.templateId" class="form-tip">
+             Warning: Changing template will update the snapshot but won't affect existing runs.
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -141,8 +160,10 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Refresh } from '@element-plus/icons-vue'
+import ActiveFilters from '@/components/ActiveFilters.vue'
 import { getProjects, createProject, updateProject, deleteProject, type Project } from '@/api/projects'
 import { getRuns } from '@/api/runs'
+import { getTemplates, type Template } from '@/api/templates'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
@@ -157,7 +178,11 @@ const pagination = reactive({
 })
 const searchQuery = ref('')
 // Store actual query applied to list (for pagination consistency)
-const appliedQuery = ref('')
+const filters = reactive({ q: '' })
+
+const filterConfig = {
+  q: { label: 'Search' }
+}
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -167,8 +192,11 @@ const formRef = ref<FormInstance>()
 
 const form = reactive({
   name: '',
-  description: ''
+  description: '',
+  templateId: undefined as number | undefined
 })
+
+const templates = ref<Template[]>([])
 
 const rules = reactive<FormRules>({
   name: [
@@ -177,6 +205,9 @@ const rules = reactive<FormRules>({
   ],
   description: [
     { max: 200, message: 'Length should be less than 200', trigger: 'blur' }
+  ],
+  templateId: [
+    { required: true, message: 'Please select a template', trigger: 'change' }
   ]
 })
 
@@ -192,7 +223,7 @@ const fetchProjects = async () => {
     const res = await getProjects({
       page: pagination.page,
       size: pagination.size,
-      q: appliedQuery.value
+      q: filters.q
     })
     projects.value = res.data.records || []
     pagination.total = res.data.total
@@ -228,14 +259,20 @@ const fetchRunCounts = async (projectList: Project[]) => {
 }
 
 const handleSearch = () => {
-  appliedQuery.value = searchQuery.value
+  filters.q = searchQuery.value
   pagination.page = 1
   fetchProjects()
 }
 
 const handleReset = () => {
   searchQuery.value = ''
-  appliedQuery.value = ''
+  filters.q = ''
+  pagination.page = 1
+  fetchProjects()
+}
+
+const handleFiltersChange = () => {
+  searchQuery.value = filters.q || ''
   pagination.page = 1
   fetchProjects()
 }
@@ -261,30 +298,49 @@ const formatDateTime = (val?: string) => {
 const goToRuns = (row: Project) => {
   if (!row.id) return
   router.push({ 
-    name: 'Runs', 
+    name: 'runs', 
     query: { projectId: String(row.id) } 
   })
 }
 
 // --- Dialog & CRUD ---
-const openCreateDialog = () => {
+const openCreateDialog = async () => {
   isEdit.value = false
   currentId.value = null
   resetForm()
   dialogVisible.value = true
+  // Fetch templates for dropdown
+  try {
+    const res = await getTemplates({ page: 1, size: 100 })
+    templates.value = res.data.records
+    const defaultTemplate = templates.value.find(t => t.isDefault)
+    if (defaultTemplate) {
+      form.templateId = defaultTemplate.id
+    } else if (templates.value.length > 0) {
+      form.templateId = templates.value[0].id
+    }
+  } catch (e) { console.error(e) }
 }
 
-const openEditDialog = (row: Project) => {
+const openEditDialog = async (row: Project) => {
   isEdit.value = true
   currentId.value = row.id || null
   form.name = row.name
   form.description = row.description || ''
+  // @ts-ignore
+  form.templateId = row.templateId
+  
   dialogVisible.value = true
+  try {
+    const res = await getTemplates({ page: 1, size: 100 })
+    templates.value = res.data.records
+  } catch (e) { console.error(e) }
 }
 
 const resetForm = () => {
   form.name = ''
   form.description = ''
+  form.templateId = undefined
   if (formRef.value) formRef.value.resetFields()
 }
 
@@ -341,6 +397,12 @@ const handleDelete = (row: Project) => {
 </script>
 
 <style scoped>
+.form-tip {
+  font-size: 12px;
+  color: #e6a23c;
+  line-height: 1.5;
+  margin-top: 5px;
+}
 .projects-container {
   padding: 20px;
 }

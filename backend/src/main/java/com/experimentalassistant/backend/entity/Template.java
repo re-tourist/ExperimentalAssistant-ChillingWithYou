@@ -8,14 +8,15 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("project")
-public class Project {
+@TableName("template")
+public class Template {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String name;
+    private String domain;
     private String description;
-    private Long templateId;
-    private String projectConfigSnapshot;
+    private String configJson;
+    private Boolean isDefault;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
