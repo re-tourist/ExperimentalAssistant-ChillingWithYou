@@ -90,8 +90,13 @@ export const useAiStore = defineStore('ai', () => {
     messages.value.push(userMsg)
 
     try {
+      const maxHistoryMessages = 12
+      const outboundMessages = messages.value
+        .slice(Math.max(0, messages.value.length - maxHistoryMessages))
+        .map(m => ({ role: m.role, content: m.content }))
+
       const payload = {
-        messages: messages.value.map(m => ({ role: m.role, content: m.content })), // Send history
+        messages: outboundMessages,
         attachments: attachments.value,
         options: {
           temperature: 0.7,

@@ -90,20 +90,17 @@ public class AiServiceImpl implements AiService {
 
         // Append attachments to the last user message or as a system message
         if (StringUtils.hasText(attachmentsContext)) {
-            // Strategy: Add a system message at the end (or before last user msg) with the context
-            // OpenAI recommends putting context in system message or user message.
-            // Let's append to the last message if it's user, or add a new system message.
-            
             Map<String, Object> contextMsg = new HashMap<>();
             contextMsg.put("role", "system");
             contextMsg.put("content", "Reference Context:\n" + attachmentsContext);
-            // Insert before the last message if exists, else add
-            if (!messages.isEmpty()) {
-                messages.add(messages.size() - 1, contextMsg);
-            } else {
-                messages.add(contextMsg);
+            int insertIndex = 0;
+            while (insertIndex < messages.size() && "system".equalsIgnoreCase(String.valueOf(messages.get(insertIndex).get("role")))) {
+                insertIndex++;
             }
+            messages.add(insertIndex, contextMsg);
         }
+
+        messages = trimMessages(messages, 12, 12000);
 
         try {
             return retryCallOpenAiCompatible(messages, options, 0);
@@ -111,6 +108,57 @@ public class AiServiceImpl implements AiService {
             handleAiError(e);
             return null; // Unreachable
         }
+    }
+
+    private List<Map<String, Object>> trimMessages(List<Map<String, Object>> messages, int maxMessages, int maxChars) {
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+
+        int effectiveMaxMessages = Math.max(1, maxMessages);
+        int effectiveMaxChars = Math.max(256, maxChars);
+
+        List<Map<String, Object>> system = new ArrayList<>();
+        List<Map<String, Object>> rest = new ArrayList<>();
+        for (Map<String, Object> m : messages) {
+            if (m == null) {
+                continue;
+            }
+            String role = String.valueOf(m.get("role"));
+            if ("system".equalsIgnoreCase(role) && system.size() < 2) {
+                system.add(m);
+            } else {
+                rest.add(m);
+            }
+        }
+
+        int remainingSlots = Math.max(0, effectiveMaxMessages - system.size());
+        int start = Math.max(0, rest.size() - remainingSlots);
+        List<Map<String, Object>> tail = rest.subList(start, rest.size());
+
+        List<Map<String, Object>> out = new ArrayList<>(system.size() + tail.size());
+        out.addAll(system);
+
+        int totalChars = out.stream()
+                .map(m -> String.valueOf(m.get("content")))
+                .mapToInt(s -> s == null ? 0 : s.length())
+                .sum();
+
+        for (int i = tail.size() - 1; i >= 0; i--) {
+            Map<String, Object> m = tail.get(i);
+            String content = String.valueOf(m.get("content"));
+            int len = content == null ? 0 : content.length();
+            if (!out.isEmpty() && totalChars + len > effectiveMaxChars) {
+                continue;
+            }
+            out.add(system.size(), m);
+            totalChars += len;
+        }
+
+        if (out.isEmpty()) {
+            return List.of(tail.get(tail.size() - 1));
+        }
+        return out;
     }
 
     private String buildAttachmentsContext(List<AiChatRequest.Attachment> attachments) {
@@ -191,7 +239,12 @@ public class AiServiceImpl implements AiService {
         
         if (options != null) {
             if (options.getTemperature() != null) payload.put("temperature", options.getTemperature());
-            if (options.getMaxTokens() != null) payload.put("max_tokens", options.getMaxTokens());
+            if (options.getMaxTokens() != null) {
+                payload.put("max_tokens", options.getMaxTokens());
+            }
+        }
+        if (!payload.containsKey("max_tokens")) {
+            payload.put("max_tokens", 1024);
         }
 
         String model = aiProperties.getHttp().getModel();
