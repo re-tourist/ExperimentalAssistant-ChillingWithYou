@@ -169,7 +169,7 @@
             <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="Created At" />
+        <el-table-column prop="endTime" label="End Time" />
       </el-table>
     </el-card>
   </div>
@@ -191,6 +191,7 @@ import {
 import { getProjects, type Project } from '@/api/projects'
 import { getMetricDefs, type MetricDef } from '@/api/metrics'
 import { dashboardCache } from '@/utils/cache'
+import { useAiStore } from '@/stores/aiAssistant'
 
 // State
 const projects = ref<Project[]>([])
@@ -221,6 +222,10 @@ const summary = ref<SummaryResponse>({
 })
 
 const topRuns = ref<TopRun[]>([])
+const trendData = ref<any[] | null>(null)
+const distributionData = ref<any[] | null>(null)
+
+const aiStore = useAiStore()
 
 // Chart Refs
 const trendChartRef = ref<HTMLElement | null>(null)
@@ -245,8 +250,33 @@ const resetDashboardData = () => {
     successRate: 0
   }
   topRuns.value = []
+  trendData.value = null
+  distributionData.value = null
   trendChart?.clear()
   distributionChart?.clear()
+}
+
+const updateAiProjectContext = () => {
+  const pid = filters.projectId
+  if (pid == null) return
+
+  const p = projects.value.find(p0 => p0.id === pid)
+  if (!p || p.id == null) return
+
+  aiStore.setProjectContext({
+    id: p.id,
+    name: p.name,
+    description: p.description
+  })
+}
+
+const updateAiDashboardContext = () => {
+  aiStore.setDashboardContext({
+    summary: summary.value,
+    trend: trendData.value,
+    distribution: distributionData.value,
+    top_runs: topRuns.value
+  })
 }
 
 const handleDateChange = (val: [string, string] | null) => {
@@ -286,6 +316,8 @@ const fetchOptions = async () => {
     if (metricDefs.value.length > 0) {
       filters.metricDefId = metricDefs.value[0].id
     }
+
+    updateAiProjectContext()
   } catch (error) {
     console.error('Failed to load options', error)
   }
@@ -309,32 +341,20 @@ const fetchDashboardData = () => {
   }
 }
 
-import { useAiStore } from '@/stores/aiAssistant'
-
-const aiStore = useAiStore()
-
-// ...
-
 const fetchSummary = async () => {
   loading.summary = true
   try {
     const cacheKey = `summary:${JSON.stringify(filters)}`
     const cached = dashboardCache.get<SummaryResponse>(cacheKey)
     
-    let data;
     if (cached) {
-      data = cached
+      summary.value = cached
     } else {
       const res = await getSummary(filters)
-      data = res.data
+      summary.value = res.data
       dashboardCache.set(cacheKey, res.data)
     }
-    summary.value = data
-    
-    // Sync to AI Store (Dashboard Snapshot)
-    // We construct a snapshot object as we fetch parts
-    updateAiContext()
-    
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -342,59 +362,27 @@ const fetchSummary = async () => {
   }
 }
 
-// ...
-
-const updateAiContext = () => {
-  // Try to find current project name
-  const currentProj = projects.value.find(p => p.id === filters.projectId)
-  if (currentProj) {
-      aiStore.setProjectContext({
-          id: currentProj.id,
-          name: currentProj.name,
-          description: currentProj.description
-      })
-  }
-  
-  // Update Snapshot
-  aiStore.setDashboardContext({
-      summary: summary.value,
-      trend: trendChart?.getOption(), // Simplification: pass chart config or raw data if available
-      distribution: distributionChart?.getOption(),
-      top_runs: topRuns.value
-  })
-}
-
 const fetchTrend = async () => {
   loading.trend = true
   try {
-    // ...
-    // (Fetch Logic)
-    // ...
     const cacheKey = `trend:${JSON.stringify(filters)}`
     let data = dashboardCache.get<any[]>(cacheKey)
+    
     if (!data) {
       const res = await getTrend(filters)
       data = res.data
       dashboardCache.set(cacheKey, data)
     }
+    
     updateTrendChart(data)
-    updateAiContext() // Update AI context with new data availability (if we store raw data)
+    trendData.value = data
+    updateAiDashboardContext()
   } catch (error) {
-    // ...
+    console.error(error)
   } finally {
     loading.trend = false
   }
 }
-
-// Ideally call updateAiContext() after all fetches or individually.
-// Let's call it in fetchDashboardData sequence or use a watcher.
-// Simple way: Call it at end of fetchDashboardData logic or inside each fetch.
-// Since fetches are async/parallel, maybe better to watch relevant data.
-
-watch([summary, topRuns, () => filters.projectId], () => {
-    updateAiContext()
-}, { deep: true })
-
 
 const fetchDistribution = async () => {
   loading.distribution = true
@@ -409,6 +397,8 @@ const fetchDistribution = async () => {
     }
     
     updateDistributionChart(data)
+    distributionData.value = data
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -429,6 +419,7 @@ const fetchTopRuns = async () => {
     }
     
     topRuns.value = data || []
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -502,6 +493,14 @@ onUnmounted(() => {
   trendChart?.dispose()
   distributionChart?.dispose()
 })
+
+watch(
+  () => filters.projectId,
+  () => {
+    updateAiProjectContext()
+    updateAiDashboardContext()
+  }
+)
 </script>
 
 <style scoped>

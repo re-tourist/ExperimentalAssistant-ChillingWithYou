@@ -8,6 +8,13 @@ export interface Run {
   status: string
   modelName?: string
   datasetName?: string
+  optimizer?: string
+  lr?: number
+  batchSize?: number
+  epochs?: number
+  seed?: number
+  note?: string
+  createdAt?: string
   startTime?: string
   endTime?: string
   updatedAt?: string
@@ -34,6 +41,14 @@ export interface RunCreateUpdate {
   name: string
   status?: string
   
+  modelName?: string
+  datasetName?: string
+  optimizer?: string
+  lr?: number
+  batchSize?: number
+  epochs?: number
+  seed?: number
+
   // Dynamic fields map (key: fieldKey, value: string/number)
   fieldValues?: Record<string, any>
   

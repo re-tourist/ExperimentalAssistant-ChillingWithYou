@@ -65,10 +65,7 @@
       <div class="section output-section" v-if="aiStore.lastAnalysis">
         <h3 class="section-title">Analysis Result</h3>
         <div class="markdown-body">
-           <MarkdownEditor
-             v-model="aiStore.lastAnalysis"
-             :preview-only="true"
-           />
+           <pre class="markdown-raw">{{ aiStore.lastAnalysis }}</pre>
         </div>
       </div>
     </div>
@@ -78,7 +75,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useAiStore } from '@/stores/aiAssistant'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const aiStore = useAiStore()
 const treeRef = ref()
@@ -242,5 +238,12 @@ const handleClose = () => {
   padding: 10px;
   min-height: 200px;
   background-color: #fff;
+}
+.markdown-raw {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

@@ -81,24 +81,6 @@
       :close-on-click-modal="false"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
-        <!-- Template Selection -->
-        <el-form-item label="Template">
-          <el-select 
-            v-model="form.templateId" 
-            placeholder="Select Template (Optional)" 
-            clearable 
-            style="width: 100%"
-            @change="handleTemplateChange"
-          >
-            <el-option
-              v-for="tmpl in templates"
-              :key="tmpl.id"
-              :label="tmpl.name"
-              :value="tmpl.id"
-            />
-          </el-select>
-        </el-form-item>
-        
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="Project" prop="projectId">
@@ -290,15 +272,63 @@
     </el-dialog>
 
     <!-- Detail Drawer -->
-    <RunDetailDrawer
+    <el-drawer
       v-model="drawerVisible"
-      v-model:runId="currentRunId"
-    />
+      title="Run Details"
+      size="50%"
+    >
+      <div v-if="currentRun" class="run-detail">
+        <div style="margin-bottom: 12px; display: flex; justify-content: flex-end">
+          <el-button type="primary" @click="openAiForCurrentRun">AI Assistant</el-button>
+        </div>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="ID">{{ currentRun.id }}</el-descriptions-item>
+          <el-descriptions-item label="Name">{{ currentRun.name }}</el-descriptions-item>
+          <el-descriptions-item label="Project ID">{{ currentRun.projectId }}</el-descriptions-item>
+          <el-descriptions-item label="Status">
+             <el-tag :type="getStatusType(currentRun.status)">{{ currentRun.status }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="Model">{{ currentRun.modelName }}</el-descriptions-item>
+          <el-descriptions-item label="Dataset">{{ currentRun.datasetName }}</el-descriptions-item>
+          <el-descriptions-item label="Optimizer">{{ currentRun.optimizer }}</el-descriptions-item>
+          <el-descriptions-item label="Learning Rate">{{ currentRun.lr }}</el-descriptions-item>
+          <el-descriptions-item label="Batch Size">{{ currentRun.batchSize }}</el-descriptions-item>
+          <el-descriptions-item label="Epochs">{{ currentRun.epochs }}</el-descriptions-item>
+          <el-descriptions-item label="Seed">{{ currentRun.seed }}</el-descriptions-item>
+          <el-descriptions-item label="Created At">{{ formatDateTime(currentRun.createdAt) }}</el-descriptions-item>
+        </el-descriptions>
+        
+        <div class="detail-section">
+           <h3>Note</h3>
+           <p>{{ currentRun.note || 'No note provided.' }}</p>
+        </div>
+
+        <div class="detail-section">
+           <h3>Tags</h3>
+           <div class="tags-list">
+              <el-tag v-for="tag in currentRun.tags" :key="tag.id" class="mr-2">{{ tag.name }}</el-tag>
+              <span v-if="!currentRun.tags?.length">No tags.</span>
+           </div>
+        </div>
+
+        <div class="detail-section">
+           <h3>Metrics</h3>
+           <el-table :data="currentRun.metrics" border stripe>
+              <el-table-column label="Metric">
+                <template #default="{ row }">
+                  {{ row.displayName || row.name || '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="value" label="Value" />
+           </el-table>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
@@ -306,15 +336,14 @@ import { getRuns, getRun, createRun, updateRun, deleteRun } from '@/api/runs'
 import { getProjects } from '@/api/projects'
 import { getTags, createTag } from '@/api/tags'
 import { getMetricDefs, createMetricDef } from '@/api/metrics'
-import { getTemplates, getTemplate } from '@/api/templates'
-import RunDetailDrawer from '@/views/runs/RunDetailDrawer.vue'
-import type { Run, RunCreateUpdate } from '@/api/runs'
+import type { Run, RunDetail, RunCreateUpdate } from '@/api/runs'
 import type { Project } from '@/api/projects'
 import type { Tag } from '@/api/tags'
 import type { MetricDef } from '@/api/metrics'
-import type { Template } from '@/api/templates'
+import { useAiStore, type AiContextRun } from '@/stores/aiAssistant'
 
 const route = useRoute()
+const aiStore = useAiStore()
 
 // --- State ---
 const loading = ref(false)
@@ -322,7 +351,6 @@ const runs = ref<Run[]>([])
 const projects = ref<Project[]>([])
 const tags = ref<Tag[]>([])
 const metricDefs = ref<MetricDef[]>([])
-const templates = ref<Template[]>([])
 const pagination = reactive({
   page: 1,
   size: 10,
@@ -339,6 +367,7 @@ const drawerVisible = ref(false)
 const submitting = ref(false)
 const isEdit = ref(false)
 const currentRunId = ref<number | null>(null)
+const currentRun = ref<RunDetail | null>(null)
 
 const optionsLoading = reactive({
   tags: false,
@@ -350,7 +379,7 @@ const formRef = ref()
 const form = reactive<RunCreateUpdate & { metrics: any[] }>({
   projectId: undefined as any,
   name: '',
-  status: 'RUNNING',
+  status: 'RUNNING', // Add status to form model to fix type error if API expects it, though interface might need update
   modelName: '',
   datasetName: '',
   optimizer: '',
@@ -359,7 +388,6 @@ const form = reactive<RunCreateUpdate & { metrics: any[] }>({
   epochs: 10,
   seed: 42,
   note: '',
-  templateId: undefined,
   tagIds: [],
   metrics: []
 })
@@ -556,7 +584,6 @@ onMounted(async () => {
   await fetchProjects()
   await fetchTags()
   await fetchMetricDefs()
-  await fetchTemplates()
   await fetchRuns()
 })
 
@@ -596,21 +623,6 @@ const fetchMetricDefs = async () => {
   }
 }
 
-const fetchTemplates = async () => {
-  try {
-    const res = await getTemplates({ page: 1, size: 100 })
-    templates.value = res.data.records
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-import { useAiStore } from '@/stores/aiAssistant'
-
-const aiStore = useAiStore()
-
-// ...
-
 const fetchRuns = async () => {
   loading.value = true
   try {
@@ -623,70 +635,10 @@ const fetchRuns = async () => {
     })
     runs.value = res.data.records
     pagination.total = res.data.total
-    
-    // Sync to AI Store (Runs Context)
-    updateAiContext()
-    
   } finally {
     loading.value = false
   }
 }
-
-// ...
-
-const updateAiContext = () => {
-  // Sync available runs
-  // Note: we might want to map Run -> AiContextRun structure
-  // Current Run interface: { id, name, status, tags, metrics ... }
-  // We need to fetch full details? Usually list endpoint returns simplified data.
-  // Requirement says: "Runs node supports: Multi-select, Search, Only display current page or last N"
-  // So we can just use the current 'runs' list.
-  // We might miss metrics/hyperparams if list doesn't have them.
-  // Let's assume list has basic info, and if user selects, we might need more details.
-  // But for Context Tree display, list info is enough. 
-  // Backend AI context might need more.
-  // If backend needs more, we might need to fetch details for selected runs before analyzing.
-  // Phase 1 simplification: Use what we have in list. 
-  // Actually, getRuns list usually doesn't return full metrics map.
-  // Let's map what we can.
-  
-  const mappedRuns = runs.value.map(r => ({
-      run_id: r.id,
-      name: r.name,
-      status: r.status,
-      tags: [], // List might not have tags? Check interface. Interface has 'tags' in RunDetail but not Run?
-                // Interface Run: id, projectId, name, status, modelName, datasetName, createdAt...
-                // Interface RunDetail extends Run: + metrics, tags...
-                // So Run list item might NOT have tags/metrics.
-                // We might need to fetch details if we want rich context.
-                // Or just pass basic info.
-      metrics: {},
-      hyperparameters: {
-          model: r.modelName,
-          dataset: r.datasetName
-      }
-  }))
-  
-  aiStore.setAvailableRuns(mappedRuns)
-  
-  // Also sync project context if filtered
-  if (filters.projectId) {
-      const currentProj = projects.value.find(p => p.id === filters.projectId)
-      if (currentProj) {
-          aiStore.setProjectContext({
-              id: currentProj.id,
-              name: currentProj.name,
-              description: currentProj.description
-          })
-      }
-  }
-}
-
-// Watch changes
-watch(() => runs.value, () => {
-    updateAiContext()
-})
-
 
 // --- Actions ---
 const handleFilter = () => {
@@ -719,14 +671,84 @@ const getStatusType = (status: string) => {
   }
 }
 
-const formatDateTime = (val: string) => {
+const formatDateTime = (val?: string) => {
   return val ? new Date(val).toLocaleString() : '-'
+}
+
+const updateAiProjectContext = (projectId?: number) => {
+  const pid = projectId ?? filters.projectId
+  if (pid == null) return
+  const p = projects.value.find(p0 => p0.id === pid)
+  if (!p || p.id == null) return
+
+  aiStore.setProjectContext({
+    id: p.id,
+    name: p.name,
+    description: p.description
+  })
+}
+
+const toAiContextRunDetail = (r: RunDetail): AiContextRun => {
+  const metrics: Record<string, number> = {}
+  ;(r.metrics || []).forEach(m => {
+    const key = (m.displayName || m.name || String(m.metricDefId)).trim()
+    if (!key) return
+    if (typeof m.value === 'number') {
+      metrics[key] = m.value
+    }
+  })
+
+  return {
+    run_id: r.id,
+    name: r.name,
+    status: r.status,
+    tags: (r.tags || []).map(t => t.name).filter(Boolean),
+    metrics,
+    hyperparameters: {
+      modelName: r.modelName,
+      datasetName: r.datasetName,
+      optimizer: r.optimizer,
+      lr: r.lr,
+      batchSize: r.batchSize,
+      epochs: r.epochs,
+      seed: r.seed
+    },
+    note: r.note
+  }
+}
+
+const upsertAiRun = (aiRun: AiContextRun) => {
+  const idx = aiStore.availableRuns.findIndex(r => r.run_id === aiRun.run_id)
+  if (idx >= 0) {
+    aiStore.availableRuns[idx] = aiRun
+  } else {
+    aiStore.availableRuns.push(aiRun)
+  }
 }
 
 // --- Detail Drawer ---
 const handleRowClick = async (row: Run) => {
-  currentRunId.value = row.id
-  drawerVisible.value = true
+  try {
+    const res = await getRun(row.id)
+    currentRun.value = res.data
+    drawerVisible.value = true
+
+    updateAiProjectContext(res.data.projectId)
+    const aiRun = toAiContextRunDetail(res.data)
+    upsertAiRun(aiRun)
+    aiStore.selectRun(aiRun.run_id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const openAiForCurrentRun = () => {
+  if (!currentRun.value) return
+  updateAiProjectContext(currentRun.value.projectId)
+  const aiRun = toAiContextRunDetail(currentRun.value)
+  upsertAiRun(aiRun)
+  aiStore.selectRun(aiRun.run_id)
+  aiStore.openDrawer('detail')
 }
 
 // --- Create/Edit Dialog ---
@@ -759,7 +781,6 @@ const openEditDialog = async (row: Run) => {
       epochs: data.epochs,
       seed: data.seed,
       note: data.note,
-      templateId: data.templateId,
       tagIds: data.tags.map(t => t.id),
       metrics: data.metrics.map(m => ({
         metricDefId: m.metricDefId,
@@ -798,7 +819,6 @@ const resetForm = () => {
     epochs: 10,
     seed: 42,
     note: '',
-    templateId: undefined,
     tagIds: [],
     metrics: []
   })
@@ -806,79 +826,6 @@ const resetForm = () => {
   metricError.value = ''
   metricValueRefs.value = []
   tagInput.value = ''
-}
-
-const handleTemplateChange = async (val: number | undefined) => {
-  if (!val) return
-  
-  // If editing, user might be just changing template but keeping data.
-  // But requirement says: "If user switches template: popup confirm overwrite"
-  // Let's check if form has data.
-  const hasData = form.metrics.length > 0 || form.tagIds!.length > 0
-  
-  if (hasData) {
-    try {
-      await ElMessageBox.confirm(
-        'Do you want to overwrite current metrics and tags with template defaults?', 
-        'Apply Template', 
-        { confirmButtonText: 'Yes, Overwrite', cancelButtonText: 'No, Keep Current', type: 'warning' }
-      )
-      // Confirmed overwrite
-      await applyTemplate(val)
-    } catch {
-      // Cancelled, do nothing (keep current data, but templateId is updated)
-    }
-  } else {
-    // No data, apply directly
-    await applyTemplate(val)
-  }
-}
-
-const applyTemplate = async (id: number) => {
-  try {
-    const res = await getTemplate(id)
-    const tmpl = res.data
-    
-    // Reset and apply
-    form.metrics = []
-    form.tagIds = []
-    
-    // Apply Metrics
-    if (tmpl.metricDefs) {
-      tmpl.metricDefs.forEach(m => {
-        if (m.isDefault) {
-          form.metrics.push({
-            metricDefId: m.metricDefId,
-            value: 0 // Default value placeholder
-          })
-        }
-      })
-    }
-    
-    // Apply Tags
-    if (tmpl.tags) {
-      const newTagIds: number[] = []
-      tmpl.tags.forEach(t => {
-        if (t.isDefault) {
-          newTagIds.push(t.tagId)
-        }
-      })
-      form.tagIds = newTagIds
-      
-      // Update selectedTags for chips display
-      // We need to fetch tags if they are not in `tags` list?
-      // `tags` list is already fetched in onMounted.
-      // But we need to ensure selectedTags computed property works.
-      // Wait, `selectedTags` logic in previous A2 implementation might rely on `form.tagIds` and `tags` list.
-      // Let's check A2 implementation of `selectedTags`.
-      // I don't see `selectedTags` defined in the visible code above, it must be there from A2 patch.
-      // Assuming A2 patch added `selectedTags` computed property.
-    }
-    
-    ElMessage.success(`Template "${tmpl.name}" applied`)
-  } catch (error) {
-    console.error(error)
-  }
 }
 
 // --- Dynamic Metrics ---

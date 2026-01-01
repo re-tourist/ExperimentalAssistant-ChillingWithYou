@@ -287,7 +287,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from '@/api/templates'
 import { getMetricDefs } from '@/api/metrics'
 import { getTags } from '@/api/tags'
-import { getDomains } from '@/api/domains'
 import ActiveFilters from '@/components/ActiveFilters.vue'
 import type { Template, TemplateDetail, TemplateField, TemplateUpsertRequest } from '@/api/templates'
 import type { MetricDef } from '@/api/metrics'
@@ -333,6 +332,22 @@ const allTags = ref<Tag[]>([])
 const drawerVisible = ref(false)
 const currentTemplate = ref<TemplateDetail | null>(null)
 
+const updateDomainOptions = (items: Template[]) => {
+  const domains = new Set<string>()
+  items.forEach(t => {
+    if (t.domain) domains.add(t.domain)
+  })
+
+  const options = Array.from(domains)
+    .sort()
+    .map(name => ({ name }))
+
+  if (!options.find(d => d.name === 'general')) {
+    options.unshift({ name: 'general' })
+  }
+  domainOptions.value = options
+}
+
 onMounted(async () => {
   fetchData()
   preloadOptions()
@@ -340,16 +355,14 @@ onMounted(async () => {
 
 const preloadOptions = async () => {
   try {
-    const [mRes, tRes, dRes] = await Promise.all([
+    const [mRes, tRes] = await Promise.all([
       getMetricDefs(),
-      getTags(),
-      getDomains()
+      getTags()
     ])
     allMetricDefs.value = mRes.data
     allTags.value = tRes.data
-    domainOptions.value = (dRes.data || []).map(d => ({ name: d.name }))
-    if (!domainOptions.value.find(d => d.name === 'general')) {
-      domainOptions.value.unshift({ name: 'general' })
+    if (domainOptions.value.length === 0) {
+      domainOptions.value = [{ name: 'general' }]
     }
   } catch (e) {
     console.error(e)
@@ -366,6 +379,7 @@ const fetchData = async () => {
       size: 100 
     })
     templates.value = res.data.records
+    updateDomainOptions(templates.value)
   } catch (error) {
     console.error(error)
   } finally {
