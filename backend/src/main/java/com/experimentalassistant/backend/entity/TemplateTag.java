@@ -5,17 +5,13 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
-@TableName("project")
-public class Project {
+@TableName("template_tag")
+public class TemplateTag {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String name;
-    private String description;
     private Long templateId;
-    private String projectConfigSnapshot;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Long tagId;
+    private Boolean isDefault;
+    private Integer sortOrder;
 }

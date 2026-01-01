@@ -14,3 +14,11 @@ export function getTags(params?: { q?: string }) {
 export function createTag(data: Tag) {
   return request.post<any, ApiResponse<Tag>>('/tags', data)
 }
+
+export function updateTag(id: number, data: Tag) {
+  return request.put<any, ApiResponse<Tag>>(`/tags/${id}`, data)
+}
+
+export function deleteTag(id: number) {
+  return request.delete<any, ApiResponse<void>>(`/tags/${id}`)
+}

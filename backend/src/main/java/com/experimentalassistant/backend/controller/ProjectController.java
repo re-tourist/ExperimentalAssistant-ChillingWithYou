@@ -9,8 +9,6 @@ import com.experimentalassistant.backend.service.ProjectService;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
@@ -31,7 +29,7 @@ public class ProjectController {
             wrapper.like(Project::getName, q).or().like(Project::getDescription, q);
         }
         projectService.page(projectPage, wrapper);
-        
+
         PageResult<Project> pageResult = new PageResult<>(
                 projectPage.getRecords(),
                 projectPage.getTotal(),
