@@ -6,10 +6,10 @@
         <where>
             r.project_id = #{filter.projectId}
             <if test="filter.dateFrom != null and filter.dateFrom != ''">
-                AND r.created_at &gt;= #{filter.dateFrom}
+                AND r.end_time &gt;= #{filter.dateFrom}
             </if>
             <if test="filter.dateTo != null and filter.dateTo != ''">
-                AND r.created_at &lt;= CONCAT(#{filter.dateTo}, ' 23:59:59')
+                AND r.end_time &lt;= CONCAT(#{filter.dateTo}, ' 23:59:59')
             </if>
             <if test="filter.status != null and filter.status != ''">
                 AND r.status = #{filter.status}
@@ -30,7 +30,7 @@
     <select id="getSummaryStats" resultType="com.experimentalassistant.backend.dto.DashboardStatsResult">
         SELECT
             COUNT(*) as totalRuns,
-            SUM(CASE WHEN r.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) THEN 1 ELSE 0 END) as runsLast7Days,
+            SUM(CASE WHEN r.end_time >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) THEN 1 ELSE 0 END) as runsLast7Days,
             SUM(CASE WHEN r.status = 'FINISHED' THEN 1 ELSE 0 END) as finishedRuns
         FROM run r
         <include refid="commonWhere"/>
@@ -58,7 +58,7 @@
 
     <select id="getTrend" resultType="com.experimentalassistant.backend.dto.DashboardTrendPoint">
         SELECT
-            DATE_FORMAT(r.created_at, '%Y-%m-%d') as x,
+            DATE_FORMAT(r.end_time, '%Y-%m-%d') as x,
             <choose>
                 <when test="filter.direction == 'MAX'">MAX(rm.value)</when>
                 <otherwise>MIN(rm.value)</otherwise>
@@ -67,7 +67,7 @@
         JOIN run_metric rm ON r.id = rm.run_id
         <include refid="commonWhere"/>
         AND rm.metric_def_id = #{filter.metricDefId}
-        GROUP BY DATE_FORMAT(r.created_at, '%Y-%m-%d')
+        GROUP BY DATE_FORMAT(r.end_time, '%Y-%m-%d')
         ORDER BY x ASC
     </select>
 
@@ -102,6 +102,17 @@
         </choose>
     </select>
 
+    <select id="getDistributionByField" resultType="com.experimentalassistant.backend.dto.DashboardDistributionItem">
+        SELECT
+            IFNULL(rv.value_text, 'Unknown') as name,
+            COUNT(*) as value
+        FROM run r
+        JOIN run_field_value rv ON r.id = rv.run_id
+        <include refid="commonWhere"/>
+        AND rv.field_key = #{fieldKey}
+        GROUP BY rv.value_text
+    </select>
+
     <select id="getTopRuns" resultType="com.experimentalassistant.backend.dto.DashboardTopRun">
         SELECT
             r.id as runId,
@@ -109,7 +120,7 @@
             r.model_name as modelName,
             r.dataset_name as datasetName,
             rm.value as value,
-            r.created_at as createdAt,
+            r.end_time as endTime,
             r.status as status
         FROM run r
         JOIN run_metric rm ON r.id = rm.run_id

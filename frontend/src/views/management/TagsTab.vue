@@ -23,9 +23,13 @@
     </el-table>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? 'Edit Tag' : 'Create Tag'" width="400px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px" @submit.prevent>
         <el-form-item label="Name" prop="name">
-          <el-input v-model="form.name" />
+          <el-input 
+            v-model="form.name" 
+            @keydown.enter.prevent="handleSubmit" 
+            placeholder="Press Enter to submit"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -91,6 +95,23 @@ const openEditDialog = (row: Tag) => {
 
 const handleSubmit = async () => {
   if (!formRef.value) return
+  
+  // Frontend Pre-check
+  const normalizedName = form.name.trim().toLowerCase()
+  if (!normalizedName) return // Will be caught by validation anyway
+
+  const existing = tags.value.find(t => 
+    t.name.toLowerCase() === normalizedName && t.id !== currentId.value
+  )
+  
+  if (existing) {
+    ElMessageBox.alert(`Tag "${existing.name}" already exists.`, 'Already Exists', {
+      confirmButtonText: 'OK',
+      type: 'warning'
+    })
+    return
+  }
+
   await formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       submitting.value = true

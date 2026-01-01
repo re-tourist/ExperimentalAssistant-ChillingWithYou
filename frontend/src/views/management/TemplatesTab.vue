@@ -2,24 +2,36 @@
   <div class="templates-tab">
     <div class="filter-bar">
       <el-input v-model="filters.q" placeholder="Search Templates" style="width: 200px; margin-right: 10px" @keyup.enter="fetchData" />
-      <el-select v-model="filters.domain" placeholder="Domain" clearable style="width: 150px; margin-right: 10px" @change="fetchData">
-        <el-option label="Classification" value="classification" />
-        <el-option label="Regression" value="regression" />
-        <el-option label="Clustering" value="clustering" />
-        <el-option label="NLP" value="nlp" />
-        <el-option label="CV" value="cv" />
-        <el-option label="Custom" value="custom" />
+      <el-select
+        v-model="filters.domain"
+        placeholder="Domain"
+        clearable
+        filterable
+        style="width: 150px; margin-right: 10px"
+        @change="fetchData"
+      >
+        <el-option
+          v-for="d in domainOptions"
+          :key="d.name"
+          :label="d.name"
+          :value="d.name"
+        />
       </el-select>
       <el-button type="primary" @click="fetchData">Search</el-button>
       <el-button type="success" @click="openCreateDialog">New Template</el-button>
     </div>
 
+    <ActiveFilters
+      v-model:filters="filters"
+      :config="filterConfig"
+      @change="fetchData"
+    />
+
     <el-table v-loading="loading" :data="templates" style="width: 100%">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="Name" min-width="150" />
       <el-table-column prop="domain" label="Domain" width="120">
-        <template #default="{ row   domain: [{ required: true, message: 'Please select domain', trigger: 'change' }]
-}">
+        <template #default="{ row }">
           <el-tag>{{ row.domain }}</el-tag>
         </template>
       </el-table-column>
@@ -42,7 +54,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEdit ? 'Edit Template' : 'New Template'"
-      width="800px"
+      width="1000px"
       :close-on-click-modal="false"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -54,13 +66,19 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="Domain" prop="domain">
-              <el-select v-model="form.domain" style="width: 100%">
-                <el-option label="Classification" value="classification" />
-                <el-option label="Regression" value="regression" />
-                <el-option label="Clustering" value="clustering" />
-                <el-option label="NLP" value="nlp" />
-                <el-option label="CV" value="cv" />
-                <el-option label="Custom" value="custom" />
+              <el-select
+                v-model="form.domain"
+                style="width: 100%"
+                filterable
+                allow-create
+                default-first-option
+              >
+                <el-option
+                  v-for="d in domainOptions"
+                  :key="d.name"
+                  :label="d.name"
+                  :value="d.name"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -71,6 +89,69 @@
         <el-form-item label="Config JSON" prop="configJson">
           <el-input v-model="form.configJson" type="textarea" :rows="3" placeholder="{}" />
         </el-form-item>
+
+        <!-- Parameter Fields Config -->
+        <el-divider content-position="left">Parameter Fields</el-divider>
+        <el-button size="small" @click="addFieldRow" style="margin-bottom: 10px">Add Field</el-button>
+        <el-table :data="form.fields" border size="small" style="width: 100%">
+          <el-table-column label="Label" width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.label" placeholder="Display Name" @input="row.fieldKey = generateKey(row.label)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="Key" width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.fieldKey" placeholder="field_key" />
+            </template>
+          </el-table-column>
+          <el-table-column label="Type" width="110">
+            <template #default="{ row }">
+              <el-select v-model="row.fieldType" style="width: 100%">
+                <el-option label="Text" value="TEXT" />
+                <el-option label="Number" value="NUMBER" />
+                <el-option label="Select" value="SELECT" />
+                <el-option label="Boolean" value="BOOLEAN" />
+                <el-option label="TextArea" value="TEXTAREA" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="Req" width="60" align="center">
+            <template #default="{ row }">
+              <el-checkbox v-model="row.isRequired" />
+            </template>
+          </el-table-column>
+          <el-table-column label="GroupBy" width="90" align="center">
+            <template #default="{ row }">
+              <el-checkbox v-model="row.isGroupBy" />
+            </template>
+          </el-table-column>
+          <el-table-column label="Default / Options" min-width="150">
+            <template #default="{ row }">
+              <el-input 
+                v-if="row.fieldType !== 'SELECT'" 
+                v-model="row.defaultValue" 
+                placeholder="Default Value" 
+              />
+              <el-input 
+                v-else 
+                v-model="row.optionsJson" 
+                placeholder='["Opt1", "Opt2"]' 
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="Order" width="80">
+            <template #default="{ row }">
+              <el-input-number v-model="row.sortOrder" size="small" controls-position="right" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column width="60" align="center">
+            <template #default="{ $index }">
+              <el-button type="danger" circle size="small" @click="removeFieldRow($index)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
 
         <!-- Metric Config -->
         <el-divider content-position="left">Metric Definitions</el-divider>
@@ -206,13 +287,21 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTemplates, getTemplate, createTemplate, updateTemplate, deleteTemplate } from '@/api/templates'
 import { getMetricDefs } from '@/api/metrics'
 import { getTags } from '@/api/tags'
-import type { Template, TemplateDetail, TemplateUpsertRequest } from '@/api/templates'
+import { getDomains } from '@/api/domains'
+import ActiveFilters from '@/components/ActiveFilters.vue'
+import type { Template, TemplateDetail, TemplateField, TemplateUpsertRequest } from '@/api/templates'
 import type { MetricDef } from '@/api/metrics'
 import type { Tag } from '@/api/tags'
 
 const loading = ref(false)
 const templates = ref<Template[]>([])
 const filters = reactive({ q: '', domain: '' })
+const domainOptions = ref<{ name: string }[]>([])
+
+const filterConfig = {
+  q: { label: 'Search' },
+  domain: { label: 'Domain' }
+}
 
 // Create/Edit
 const dialogVisible = ref(false)
@@ -226,6 +315,7 @@ const form = reactive<TemplateUpsertRequest>({
   domain: 'general',
   description: '',
   configJson: '',
+  fields: [],
   metricDefs: [],
   tags: []
 })
@@ -245,15 +335,26 @@ const currentTemplate = ref<TemplateDetail | null>(null)
 
 onMounted(async () => {
   fetchData()
-  // Pre-load options
+  preloadOptions()
+})
+
+const preloadOptions = async () => {
   try {
-    const [mRes, tRes] = await Promise.all([getMetricDefs(), getTags()])
+    const [mRes, tRes, dRes] = await Promise.all([
+      getMetricDefs(),
+      getTags(),
+      getDomains()
+    ])
     allMetricDefs.value = mRes.data
     allTags.value = tRes.data
+    domainOptions.value = (dRes.data || []).map(d => ({ name: d.name }))
+    if (!domainOptions.value.find(d => d.name === 'general')) {
+      domainOptions.value.unshift({ name: 'general' })
+    }
   } catch (e) {
     console.error(e)
   }
-})
+}
 
 const fetchData = async () => {
   loading.value = true
@@ -292,6 +393,18 @@ const handleEdit = async (row: Template) => {
     form.domain = data.domain
     form.description = data.description
     form.configJson = data.configJson
+    form.fields = data.fields.map(f => ({
+      fieldKey: f.fieldKey,
+      label: f.label,
+      fieldType: f.fieldType,
+      isRequired: f.isRequired,
+      isGroupBy: f.isGroupBy,
+      defaultValue: f.defaultValue,
+      sortOrder: f.sortOrder,
+      optionsJson: f.optionsJson,
+      unit: f.unit,
+      placeholder: f.placeholder
+    }))
     form.metricDefs = data.metricDefs.map(m => ({
       metricDefId: m.metricDefId,
       isDefault: m.isDefault,
@@ -330,6 +443,7 @@ const resetForm = () => {
   form.domain = 'general'
   form.description = ''
   form.configJson = ''
+  form.fields = []
   form.metricDefs = []
   form.tags = []
   if (formRef.value) formRef.value.resetFields()
@@ -378,6 +492,33 @@ const removeTagRow = (idx: number) => {
 }
 const isTagDisabled = (id: number) => {
   return form.tags?.some(t => t.tagId === id)
+}
+
+const addFieldRow = () => {
+  if (!form.fields) form.fields = []
+  const nextIndex = form.fields.length + 1
+  form.fields.push({
+    fieldKey: `field_${nextIndex}`,
+    label: '',
+    fieldType: 'TEXT',
+    isRequired: false,
+    isGroupBy: false,
+    defaultValue: '',
+    sortOrder: nextIndex
+  } satisfies TemplateField)
+}
+
+const removeFieldRow = (idx: number) => {
+  form.fields?.splice(idx, 1)
+}
+
+const generateKey = (label: string) => {
+  const normalized = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return normalized || 'field'
 }
 
 const formatDateTime = (val?: string) => {

@@ -53,9 +53,14 @@
           <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createdAt" label="Created At" width="180">
+      <el-table-column prop="startTime" label="Start Time" width="180">
         <template #default="{ row }">
-            {{ formatDateTime(row.createdAt) }}
+            {{ formatDateTime(row.startTime) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="endTime" label="End Time" width="180">
+        <template #default="{ row }">
+            {{ formatDateTime(row.endTime || row.updatedAt) }}
         </template>
       </el-table-column>
       <el-table-column label="Actions" width="150" fixed="right">
@@ -120,8 +125,8 @@
            </el-col>
           <el-col :span="12">
              <el-form-item label="Tags" prop="tagIds">
-                <div style="width: 100%">
-                  <div style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 32px">
+                <div class="tag-input-wrapper">
+                  <div class="tag-selected-list">
                     <el-tag
                       v-for="tag in selectedTags"
                       :key="tag.id"
@@ -134,11 +139,29 @@
                   <el-input
                     ref="tagInputRef"
                     v-model="tagInput"
-                    placeholder="输入标签，回车添加"
-                    style="margin-top: 8px"
+                    placeholder="输入标签，↑↓选择，Enter/Tab 补全"
                     :disabled="creatingTag || optionsLoading.tags"
-                    @keyup.enter="handleTagEnter"
+                    @focus="onTagFocus"
+                    @blur="onTagBlur"
+                    @keydown.down.prevent="onTagKeyDown('down')"
+                    @keydown.up.prevent="onTagKeyDown('up')"
+                    @keydown.enter.prevent="onTagConfirm('enter')"
+                    @keydown.tab.prevent="onTagConfirm('tab')"
+                    @input="onTagInputChange"
                   />
+                  <div
+                    v-if="tagSuggestions.length && tagInputFocused"
+                    class="tag-suggestion-panel"
+                  >
+                    <div
+                      v-for="(tag, idx) in tagSuggestions"
+                      :key="tag.id"
+                      :class="['tag-suggestion-item', { active: idx === activeTagIndex }]"
+                      @mousedown.prevent="handleTagSuggestionClick(tag)"
+                    >
+                      {{ tag.name }}
+                    </div>
+                  </div>
                 </div>
              </el-form-item>
            </el-col>
@@ -146,47 +169,89 @@
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Model" prop="modelName">
-              <el-input v-model="form.modelName" placeholder="Model Name" />
+            <el-form-item label="Start Time" prop="startTime">
+              <el-date-picker
+                v-model="form.startTime"
+                type="datetime"
+                placeholder="Select start time"
+                style="width: 100%"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Dataset" prop="datasetName">
-              <el-input v-model="form.datasetName" placeholder="Dataset Name" />
+            <el-form-item label="End Time" prop="endTime">
+              <el-date-picker
+                v-model="form.endTime"
+                type="datetime"
+                placeholder="Select end time"
+                style="width: 100%"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+              />
             </el-form-item>
           </el-col>
         </el-row>
 
-        <el-row :gutter="20">
-          <el-col :span="8">
-             <el-form-item label="Optimizer" prop="optimizer">
-               <el-input v-model="form.optimizer" />
-             </el-form-item>
-          </el-col>
-          <el-col :span="8">
-             <el-form-item label="Learning Rate" prop="lr">
-               <el-input-number v-model="form.lr" :precision="6" :step="0.0001" style="width: 100%" />
-             </el-form-item>
-          </el-col>
-           <el-col :span="8">
-             <el-form-item label="Batch Size" prop="batchSize">
-               <el-input-number v-model="form.batchSize" :min="1" style="width: 100%" />
-             </el-form-item>
-           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="8">
-             <el-form-item label="Epochs" prop="epochs">
-               <el-input-number v-model="form.epochs" :min="1" style="width: 100%" />
-             </el-form-item>
-          </el-col>
-          <el-col :span="8">
-             <el-form-item label="Seed" prop="seed">
-               <el-input-number v-model="form.seed" style="width: 100%" />
-             </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- Dynamic Template Fields -->
+        <div v-loading="templateLoading">
+          <el-row :gutter="20">
+            <el-col 
+              v-for="field in currentTemplateFields" 
+              :key="field.fieldKey"
+              :span="field.fieldType === 'TEXTAREA' ? 24 : 12"
+            >
+              <el-form-item 
+                :label="field.label" 
+                :prop="'fieldValues.' + field.fieldKey"
+                :rules="[{ required: field.isRequired, message: field.label + ' is required' }]"
+              >
+                <!-- TEXT -->
+                <el-input 
+                  v-if="field.fieldType === 'TEXT'" 
+                  v-model="form.fieldValues[field.fieldKey]" 
+                  :placeholder="field.placeholder || field.label" 
+                />
+                
+                <!-- TEXTAREA -->
+                <el-input 
+                  v-else-if="field.fieldType === 'TEXTAREA'" 
+                  type="textarea"
+                  v-model="form.fieldValues[field.fieldKey]" 
+                  :placeholder="field.placeholder || field.label" 
+                />
+
+                <!-- NUMBER -->
+                <el-input-number 
+                  v-else-if="field.fieldType === 'NUMBER'" 
+                  v-model="form.fieldValues[field.fieldKey]" 
+                  style="width: 100%"
+                />
+                
+                <!-- SELECT -->
+                <el-select 
+                  v-else-if="field.fieldType === 'SELECT'" 
+                  v-model="form.fieldValues[field.fieldKey]" 
+                  style="width: 100%"
+                >
+                  <el-option 
+                    v-for="opt in (field.optionsJson ? JSON.parse(field.optionsJson) : [])" 
+                    :key="opt" 
+                    :label="opt" 
+                    :value="opt" 
+                  />
+                </el-select>
+
+                <!-- BOOLEAN -->
+                <el-switch 
+                  v-else-if="field.fieldType === 'BOOLEAN'" 
+                  v-model="form.fieldValues[field.fieldKey]" 
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
 
         <el-form-item label="Note" prop="note">
           <el-input v-model="form.note" type="textarea" :rows="2" />
@@ -295,14 +360,15 @@ import { getRuns, getRun, createRun, updateRun, deleteRun } from '@/api/runs'
 import { getProjects } from '@/api/projects'
 import { getTags, createTag } from '@/api/tags'
 import { getMetricDefs, createMetricDef } from '@/api/metrics'
-import { getTemplates, getTemplate } from '@/api/templates'
 import RunDetailDrawer from '@/views/runs/RunDetailDrawer.vue'
 import ActiveFilters from '@/components/ActiveFilters.vue'
 import type { Run, RunCreateUpdate } from '@/api/runs'
 import type { Project } from '@/api/projects'
 import type { Tag } from '@/api/tags'
 import type { MetricDef } from '@/api/metrics'
-import type { Template } from '@/api/templates'
+
+import { getTemplate } from '@/api/templates'
+import type { TemplateField } from '@/api/templates'
 
 const route = useRoute()
 
@@ -312,7 +378,9 @@ const runs = ref<Run[]>([])
 const projects = ref<Project[]>([])
 const tags = ref<Tag[]>([])
 const metricDefs = ref<MetricDef[]>([])
-const templates = ref<Template[]>([])
+const currentTemplateFields = ref<TemplateField[]>([])
+const templateLoading = ref(false)
+
 const pagination = reactive({
   page: 1,
   size: 10,
@@ -350,21 +418,87 @@ const optionsLoading = reactive({
 
 // Form
 const formRef = ref()
-const form = reactive<RunCreateUpdate & { metrics: any[] }>({
+const form = reactive<RunCreateUpdate & { metrics: any[], fieldValues: Record<string, any> }>({
   projectId: undefined as any,
   name: '',
   status: 'RUNNING',
-  modelName: '',
-  datasetName: '',
-  optimizer: '',
-  lr: 0.001,
-  batchSize: 32,
-  epochs: 10,
-  seed: 42,
+  fieldValues: {},
   note: '',
-  // templateId: undefined, // Removed
-  tagIds: [],
-  metrics: []
+  metrics: [] as any[],
+  tagIds: [] as number[],
+  startTime: '',
+  endTime: ''
+})
+
+const castTemplateFieldValue = (field: TemplateField, value: any) => {
+  if (value === undefined || value === null) return value
+  if (typeof value === 'string' && value.trim() === '') return value
+  if (field.fieldType === 'NUMBER') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : value
+  }
+  if (field.fieldType === 'BOOLEAN') {
+    if (typeof value === 'boolean') return value
+    const s = String(value).toLowerCase()
+    if (s === 'true') return true
+    if (s === 'false') return false
+    return value
+  }
+  return value
+}
+
+const buildTemplateDefaults = (fields: TemplateField[]) => {
+  const defaults: Record<string, any> = {}
+  fields.forEach(f => {
+    if (f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
+      defaults[f.fieldKey] = castTemplateFieldValue(f, f.defaultValue)
+    }
+  })
+  return defaults
+}
+
+const normalizeFieldValuesByTemplate = (raw: Record<string, any> | undefined, fields: TemplateField[]) => {
+  const base: Record<string, any> = { ...raw }
+  const fieldMap = new Map(fields.map(f => [f.fieldKey, f] as const))
+  Object.keys(base).forEach(key => {
+    const field = fieldMap.get(key)
+    if (!field) return
+    base[key] = castTemplateFieldValue(field, base[key])
+  })
+  return base
+}
+
+watch(() => form.projectId, async (newVal) => {
+  if (!newVal) {
+    currentTemplateFields.value = []
+    form.fieldValues = {}
+    return
+  }
+  
+  // Find project to get templateId
+  const project = projects.value.find(p => p.id === newVal)
+  if (project && project.templateId) {
+    templateLoading.value = true
+    try {
+      const res = await getTemplate(project.templateId)
+      currentTemplateFields.value = res.data.fields || []
+      
+      const defaults = buildTemplateDefaults(currentTemplateFields.value)
+      if (isEdit.value) {
+        const existing = normalizeFieldValuesByTemplate(form.fieldValues, currentTemplateFields.value)
+        form.fieldValues = { ...defaults, ...existing }
+      } else {
+        form.fieldValues = { ...defaults }
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      templateLoading.value = false
+    }
+  } else {
+    currentTemplateFields.value = []
+    form.fieldValues = {}
+  }
 })
 
 const rules = {
@@ -378,17 +512,28 @@ const metricValueRefs = ref<any[]>([])
 
 const tagInputRef = ref<any>(null)
 const tagInput = ref('')
+const tagInputFocused = ref(false)
 const creatingTag = ref(false)
+const activeTagIndex = ref(-1)
 
 const selectedTags = computed(() => {
   const idSet = new Set(form.tagIds || [])
   return tags.value.filter(t => t.id != null && idSet.has(t.id))
 })
 
-const removeSelectedTag = (tagId: number | undefined) => {
-  if (tagId == null) return
-  form.tagIds = (form.tagIds || []).filter(id => id !== tagId)
-}
+const tagSuggestions = computed(() => {
+  const query = tagInput.value.trim().toLowerCase()
+  const sorted = [...tags.value].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' })
+  )
+
+  if (!query) {
+    return sorted.slice(0, 20)
+  }
+  return sorted
+    .filter(t => (t.name || '').toLowerCase().includes(query))
+    .slice(0, 20)
+})
 
 const focusTagInput = async () => {
   await nextTick()
@@ -403,12 +548,37 @@ const addTagId = (tagId: number | undefined) => {
   }
 }
 
+const removeSelectedTag = (tagId: number | undefined) => {
+  if (tagId == null) return
+  form.tagIds = (form.tagIds || []).filter(id => id !== tagId)
+}
+
 const findTagByName = (name: string) => {
   const normalized = name.trim().toLowerCase()
   return tags.value.find(t => (t.name || '').trim().toLowerCase() === normalized)
 }
 
-const handleTagEnter = async () => {
+const onTagFocus = () => {
+  tagInputFocused.value = true
+}
+
+const onTagBlur = () => {
+  tagInputFocused.value = false
+  activeTagIndex.value = -1
+}
+
+const onTagInputChange = () => {
+  activeTagIndex.value = tagSuggestions.value.length > 0 ? 0 : -1
+}
+
+const handleTagSuggestionClick = (tag: Tag) => {
+  addTagId(tag.id)
+  tagInput.value = ''
+  activeTagIndex.value = -1
+  focusTagInput()
+}
+
+const confirmTagByText = async () => {
   const raw = tagInput.value
   const name = raw.trim()
   if (!name) return
@@ -447,6 +617,36 @@ const handleTagEnter = async () => {
     tagInput.value = ''
     await focusTagInput()
   }
+}
+
+const onTagKeyDown = (dir: 'up' | 'down') => {
+  const list = tagSuggestions.value
+  if (!list.length) return
+
+  if (activeTagIndex.value === -1) {
+    activeTagIndex.value = dir === 'down' ? 0 : list.length - 1
+    return
+  }
+
+  if (dir === 'down') {
+    activeTagIndex.value = (activeTagIndex.value + 1) % list.length
+  } else {
+    activeTagIndex.value = (activeTagIndex.value - 1 + list.length) % list.length
+  }
+}
+
+const onTagConfirm = async (_from: 'enter' | 'tab') => {
+  const list = tagSuggestions.value
+  if (list.length && activeTagIndex.value >= 0 && activeTagIndex.value < list.length) {
+    const tag = list[activeTagIndex.value]
+    addTagId(tag.id)
+    tagInput.value = ''
+    activeTagIndex.value = -1
+    await focusTagInput()
+    return
+  }
+
+  await confirmTagByText()
 }
 
 const metricDefDialogVisible = ref(false)
@@ -559,7 +759,6 @@ onMounted(async () => {
   await fetchProjects()
   await fetchTags()
   await fetchMetricDefs()
-  await fetchTemplates()
   await fetchRuns()
 })
 
@@ -599,21 +798,6 @@ const fetchMetricDefs = async () => {
   }
 }
 
-const fetchTemplates = async () => {
-  try {
-    const res = await getTemplates({ page: 1, size: 100 })
-    templates.value = res.data.records
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-import { useAiStore } from '@/stores/aiAssistant'
-
-const aiStore = useAiStore()
-
-// ...
-
 const fetchRuns = async () => {
   loading.value = true
   try {
@@ -626,68 +810,70 @@ const fetchRuns = async () => {
     })
     runs.value = res.data.records
     pagination.total = res.data.total
-    
-    // Sync to AI Store (Runs Context)
-    updateAiContext()
-    
   } finally {
     loading.value = false
   }
 }
 
-// ...
+const handleProjectChange = (projectId: number | undefined) => {
+  if (!projectId) return
+  const project = projects.value.find(p => p.id === projectId)
+  if (!project || !project.projectConfigSnapshot) return
 
-const updateAiContext = () => {
-  // Sync available runs
-  // Note: we might want to map Run -> AiContextRun structure
-  // Current Run interface: { id, name, status, tags, metrics ... }
-  // We need to fetch full details? Usually list endpoint returns simplified data.
-  // Requirement says: "Runs node supports: Multi-select, Search, Only display current page or last N"
-  // So we can just use the current 'runs' list.
-  // We might miss metrics/hyperparams if list doesn't have them.
-  // Let's assume list has basic info, and if user selects, we might need more details.
-  // But for Context Tree display, list info is enough. 
-  // Backend AI context might need more.
-  // If backend needs more, we might need to fetch details for selected runs before analyzing.
-  // Phase 1 simplification: Use what we have in list. 
-  // Actually, getRuns list usually doesn't return full metrics map.
-  // Let's map what we can.
-  
-  const mappedRuns = runs.value.map(r => ({
-      run_id: r.id,
-      name: r.name,
-      status: r.status,
-      tags: [], // List might not have tags? Check interface. Interface has 'tags' in RunDetail but not Run?
-                // Interface Run: id, projectId, name, status, modelName, datasetName, createdAt...
-                // Interface RunDetail extends Run: + metrics, tags...
-                // So Run list item might NOT have tags/metrics.
-                // We might need to fetch details if we want rich context.
-                // Or just pass basic info.
-      metrics: {},
-      hyperparameters: {
-          model: r.modelName,
-          dataset: r.datasetName
-      }
-  }))
-  
-  aiStore.setAvailableRuns(mappedRuns)
-  
-  // Also sync project context if filtered
-  if (filters.projectId) {
-      const currentProj = projects.value.find(p => p.id === filters.projectId)
-      if (currentProj) {
-          aiStore.setProjectContext({
-              id: currentProj.id,
-              name: currentProj.name,
-              description: currentProj.description
+  // Apply snapshot defaults
+  try {
+    const snapshot = JSON.parse(project.projectConfigSnapshot)
+    // Snapshot structure from backend: { sourceTemplateId, configJson, ... }
+    // Wait, the backend snapshot logic (ProjectServiceImpl.java) put:
+    // sourceTemplateId, sourceTemplateName, domain, configJson
+    // It didn't put metricDefs or tags explicitly into the map!
+    // It relied on "inherit flexible config".
+    // BUT, TemplateUpsertRequest has metricDefs and tags.
+    // Template entity has configJson string.
+    // If we want to apply defaults, we need the metricDefs and tags in the snapshot.
+    // Backend `handleTemplateSnapshot` only put `configJson` string.
+    // It did NOT put the relations (template_metric_def, template_tag).
+    // THIS IS A BUG/MISSING FEATURE IN PHASE 1 BACKEND.
+    
+    // I need to fix Backend ProjectServiceImpl first to include metricDefs and tags in snapshot.
+    // Otherwise Frontend cannot apply them.
+
+    // Apply defaults
+    form.metrics = []
+    form.tagIds = []
+
+    if (snapshot.metricDefs && Array.isArray(snapshot.metricDefs)) {
+      snapshot.metricDefs.forEach((m: any) => {
+        if (m.isDefault) {
+          form.metrics.push({
+            metricDefId: m.metricDefId,
+            value: 0
           })
-      }
+        }
+      })
+    }
+
+    if (snapshot.tags && Array.isArray(snapshot.tags)) {
+      const newTags: number[] = []
+      snapshot.tags.forEach((t: any) => {
+        if (t.isDefault) {
+          newTags.push(t.tagId)
+        }
+      })
+      form.tagIds = newTags
+    }
+
+    ElMessage.success('Project defaults applied')
+  } catch (e) {
+    console.error('Failed to parse project config snapshot', e)
   }
 }
 
 // Watch changes
-watch(() => runs.value, () => {
-    updateAiContext()
+watch(() => form.projectId, (newVal) => {
+  if (!isEdit.value && newVal) {
+    handleProjectChange(newVal)
+  }
 })
 
 
@@ -722,7 +908,7 @@ const getStatusType = (status: string) => {
   }
 }
 
-const formatDateTime = (val: string) => {
+const formatDateTime = (val?: string) => {
   return val ? new Date(val).toLocaleString() : '-'
 }
 
@@ -747,6 +933,7 @@ const openEditDialog = async (row: Run) => {
   isEdit.value = true
   currentRunId.value = row.id
   try {
+    resetForm()
     await Promise.all([fetchTags(), fetchMetricDefs()])
     const res = await getRun(row.id)
     const data = res.data
@@ -763,13 +950,17 @@ const openEditDialog = async (row: Run) => {
       seed: data.seed,
       note: data.note,
       // templateId: data.templateId,
+      fieldValues: data.fieldValues || {},
       tagIds: data.tags.map(t => t.id),
       metrics: data.metrics.map(m => ({
         metricDefId: m.metricDefId,
         value: m.value
-      }))
+      })),
+      startTime: data.startTime,
+      endTime: data.endTime
     })
     dialogVisible.value = true
+    await nextTick()
     focusTagInput()
   } catch (error) {
     console.error(error)
@@ -800,88 +991,18 @@ const resetForm = () => {
     batchSize: 32,
     epochs: 10,
     seed: 42,
+    fieldValues: {},
     note: '',
     // templateId: undefined,
     tagIds: [],
-    metrics: []
+    metrics: [],
+    startTime: '',
+    endTime: ''
   })
   if (formRef.value) formRef.value.resetFields()
   metricError.value = ''
   metricValueRefs.value = []
   tagInput.value = ''
-}
-
-const handleTemplateChange = async (val: number | undefined) => {
-  if (!val) return
-  
-  // If editing, user might be just changing template but keeping data.
-  // But requirement says: "If user switches template: popup confirm overwrite"
-  // Let's check if form has data.
-  const hasData = form.metrics.length > 0 || form.tagIds!.length > 0
-  
-  if (hasData) {
-    try {
-      await ElMessageBox.confirm(
-        'Do you want to overwrite current metrics and tags with template defaults?', 
-        'Apply Template', 
-        { confirmButtonText: 'Yes, Overwrite', cancelButtonText: 'No, Keep Current', type: 'warning' }
-      )
-      // Confirmed overwrite
-      await applyTemplate(val)
-    } catch {
-      // Cancelled, do nothing (keep current data, but templateId is updated)
-    }
-  } else {
-    // No data, apply directly
-    await applyTemplate(val)
-  }
-}
-
-const applyTemplate = async (id: number) => {
-  try {
-    const res = await getTemplate(id)
-    const tmpl = res.data
-    
-    // Reset and apply
-    form.metrics = []
-    form.tagIds = []
-    
-    // Apply Metrics
-    if (tmpl.metricDefs) {
-      tmpl.metricDefs.forEach(m => {
-        if (m.isDefault) {
-          form.metrics.push({
-            metricDefId: m.metricDefId,
-            value: 0 // Default value placeholder
-          })
-        }
-      })
-    }
-    
-    // Apply Tags
-    if (tmpl.tags) {
-      const newTagIds: number[] = []
-      tmpl.tags.forEach(t => {
-        if (t.isDefault) {
-          newTagIds.push(t.tagId)
-        }
-      })
-      form.tagIds = newTagIds
-      
-      // Update selectedTags for chips display
-      // We need to fetch tags if they are not in `tags` list?
-      // `tags` list is already fetched in onMounted.
-      // But we need to ensure selectedTags computed property works.
-      // Wait, `selectedTags` logic in previous A2 implementation might rely on `form.tagIds` and `tags` list.
-      // Let's check A2 implementation of `selectedTags`.
-      // I don't see `selectedTags` defined in the visible code above, it must be there from A2 patch.
-      // Assuming A2 patch added `selectedTags` computed property.
-    }
-    
-    ElMessage.success(`Template "${tmpl.name}" applied`)
-  } catch (error) {
-    console.error(error)
-  }
 }
 
 // --- Dynamic Metrics ---
@@ -918,7 +1039,9 @@ const handleSubmit = async () => {
       
       submitting.value = true
       try {
-        const payload = { ...form }
+        const payload: any = { ...form }
+        if (!payload.startTime) delete payload.startTime
+        if (!payload.endTime) delete payload.endTime
         // Ensure status is passed if needed, currently RunCreateUpdate interface might miss it if backend requires it
         // Based on previous step RunCreateUpdate interface:
         // export interface RunCreateUpdate { ... status?: string ... } - Wait, let's check interface
@@ -973,5 +1096,39 @@ const handleSubmit = async () => {
 }
 .mr-2 {
   margin-right: 8px;
+}
+.tag-input-wrapper {
+  position: relative;
+}
+.tag-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.tag-suggestion-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background: #fff;
+  max-height: 180px;
+  overflow-y: auto;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 4px 0;
+  z-index: 2000;
+}
+.tag-suggestion-item {
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.tag-suggestion-item.active {
+  background-color: var(--el-color-primary-light-9, #ecf5ff);
+  color: var(--el-color-primary, #409eff);
 }
 </style>

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElMessage, ElNotification } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import type { ApiResponse } from '@/api/types'
 
 const service = axios.create({

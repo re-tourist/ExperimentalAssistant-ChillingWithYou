@@ -27,18 +27,26 @@
     </el-table>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? 'Edit Metric Definition' : 'Create Metric Definition'" width="500px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
         <el-form-item label="Name" prop="name">
-          <el-input v-model="form.name" placeholder="e.g. acc" />
+          <el-input 
+            v-model="form.name" 
+            placeholder="e.g. acc" 
+            @keydown.enter.prevent="handleSubmit"
+          />
         </el-form-item>
         <el-form-item label="Direction" prop="direction">
           <el-select v-model="form.direction" style="width: 100%">
             <el-option label="MAX" value="MAX" />
             <el-option label="MIN" value="MIN" />
+            <el-option label="NONE" value="NONE" />
           </el-select>
         </el-form-item>
         <el-form-item label="Description" prop="description">
-          <el-input v-model="form.description" type="textarea" />
+          <el-input 
+            v-model="form.description" 
+            type="textarea" 
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -65,7 +73,7 @@ const submitting = ref(false)
 const isEdit = ref(false)
 const currentId = ref<number | null>(null)
 const formRef = ref()
-const form = reactive<{ name: string; direction: 'MAX' | 'MIN'; description: string }>({ name: '', direction: 'MAX', description: '' })
+const form = reactive<{ name: string; direction: 'MAX' | 'MIN' | 'NONE'; description: string }>({ name: '', direction: 'MAX', description: '' })
 const rules = {
   name: [{ required: true, message: 'Please enter metric name', trigger: 'blur' }],
   direction: [{ required: true, message: 'Please select direction', trigger: 'change' }]

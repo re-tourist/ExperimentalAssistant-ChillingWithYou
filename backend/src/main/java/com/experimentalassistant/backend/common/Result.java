@@ -26,4 +26,11 @@ public class Result<T> {
         result.message = message == null ? "error" : message;
         return result;
     }
+
+    public static <T> Result<T> error(Integer code, String message) {
+        Result<T> result = new Result<>();
+        result.code = code;
+        result.message = message;
+        return result;
+    }
 }

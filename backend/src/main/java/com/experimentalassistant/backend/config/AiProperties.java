@@ -8,14 +8,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "ai")
 public class AiProperties {
+    private boolean enable = true; // Default true, but can be disabled
     private String provider = "mock";
     private Http http = new Http();
 
     @Data
     public static class Http {
-        private String baseUrl;
+        private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
         private String apiKey;
-        private long timeoutMs = 5000;
-        private String model;
+        private long timeoutMs = 90000;
+        private String model = "qwen-turbo";
     }
 }

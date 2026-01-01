@@ -23,7 +23,8 @@ public class Run {
     private Integer epochs;
     private Integer seed;
     private String note;
-    private Long templateId;
-    private LocalDateTime createdAt;
+    // Template ID removed as per decoupling requirement
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
     private LocalDateTime updatedAt;
 }

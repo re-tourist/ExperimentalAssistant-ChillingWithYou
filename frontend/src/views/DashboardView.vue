@@ -134,12 +134,15 @@
               <el-select 
                 v-model="filters.by" 
                 size="small" 
-                style="width: 100px" 
+                style="width: 140px" 
                 @change="handleFilterChange"
               >
-                <el-option label="Model" value="model" />
-                <el-option label="Dataset" value="dataset" />
-                <el-option label="Tag" value="tag" />
+                <el-option
+                  v-for="opt in distributionOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
               </el-select>
             </div>
           </template>
@@ -169,14 +172,14 @@
             <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="Created At" />
+        <el-table-column prop="endTime" label="End Time" />
       </el-table>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { 
@@ -189,6 +192,7 @@ import {
   type TopRun
 } from '@/api/dashboard'
 import { getProjects, type Project } from '@/api/projects'
+import { getTemplate, type TemplateField } from '@/api/templates'
 import { getMetricDefs, type MetricDef } from '@/api/metrics'
 import { dashboardCache } from '@/utils/cache'
 
@@ -206,6 +210,10 @@ const filters = reactive<DashboardFilter>({
   by: 'model',
   limit: 10
 })
+
+const distributionOptions = ref<{ label: string; value: string }[]>([
+  { label: 'Tag', value: 'tag' }
+])
 
 const loading = reactive({
   summary: false,
@@ -260,7 +268,8 @@ const handleDateChange = (val: [string, string] | null) => {
   handleFilterChange()
 }
 
-const handleFilterChange = () => {
+const handleFilterChange = async () => {
+  await updateDistributionOptions()
   fetchDashboardData()
 }
 
@@ -286,8 +295,48 @@ const fetchOptions = async () => {
     if (metricDefs.value.length > 0) {
       filters.metricDefId = metricDefs.value[0].id
     }
+    await updateDistributionOptions()
   } catch (error) {
     console.error('Failed to load options', error)
+  }
+}
+
+const updateDistributionOptions = async () => {
+  const baseOptions: { label: string; value: string }[] = [
+    { label: 'Tag', value: 'tag' }
+  ]
+
+  const project = projects.value.find(p => p.id === filters.projectId)
+  if (!project || !project.templateId) {
+    distributionOptions.value = baseOptions
+    if (!baseOptions.some(opt => opt.value === filters.by) && baseOptions.length > 0) {
+      filters.by = baseOptions[0].value
+    }
+    return
+  }
+
+  try {
+    const res = await getTemplate(project.templateId)
+    const fields: TemplateField[] = res.data.fields || []
+    const groupByOptions = fields
+      .filter(f => f.isGroupBy)
+      .map(f => ({
+        label: f.label || f.fieldKey,
+        value: `field:${f.fieldKey}`
+      }))
+
+    const combined = [...baseOptions, ...groupByOptions]
+    distributionOptions.value = combined
+
+    if (!combined.some(opt => opt.value === filters.by) && combined.length > 0) {
+      filters.by = combined[0].value
+    }
+  } catch (error) {
+    console.error('Failed to load group-by fields', error)
+    distributionOptions.value = baseOptions
+    if (!baseOptions.some(opt => opt.value === filters.by) && baseOptions.length > 0) {
+      filters.by = baseOptions[0].value
+    }
   }
 }
 
@@ -309,10 +358,6 @@ const fetchDashboardData = () => {
   }
 }
 
-import { useAiStore } from '@/stores/aiAssistant'
-
-const aiStore = useAiStore()
-
 // ...
 
 const fetchSummary = async () => {
@@ -330,46 +375,21 @@ const fetchSummary = async () => {
       dashboardCache.set(cacheKey, res.data)
     }
     summary.value = data
-    
-    // Sync to AI Store (Dashboard Snapshot)
-    // We construct a snapshot object as we fetch parts
-    updateAiContext()
-    
-  } catch (error) {
+  } catch (error: any) {
     console.error(error)
+    if (error.response?.data?.message?.includes('NONE')) {
+       // Metric has no direction, keep summary valid but empty bestMetric if possible, 
+       // or just reset summary. Since API failed, we have no data.
+       summary.value = { totalRuns: 0, runsLast7Days: 0, successRate: 0, bestMetric: undefined }
+    }
   } finally {
     loading.summary = false
   }
 }
 
-// ...
-
-const updateAiContext = () => {
-  // Try to find current project name
-  const currentProj = projects.value.find(p => p.id === filters.projectId)
-  if (currentProj) {
-      aiStore.setProjectContext({
-          id: currentProj.id,
-          name: currentProj.name,
-          description: currentProj.description
-      })
-  }
-  
-  // Update Snapshot
-  aiStore.setDashboardContext({
-      summary: summary.value,
-      trend: trendChart?.getOption(), // Simplification: pass chart config or raw data if available
-      distribution: distributionChart?.getOption(),
-      top_runs: topRuns.value
-  })
-}
-
 const fetchTrend = async () => {
   loading.trend = true
   try {
-    // ...
-    // (Fetch Logic)
-    // ...
     const cacheKey = `trend:${JSON.stringify(filters)}`
     let data = dashboardCache.get<any[]>(cacheKey)
     if (!data) {
@@ -378,23 +398,15 @@ const fetchTrend = async () => {
       dashboardCache.set(cacheKey, data)
     }
     updateTrendChart(data)
-    updateAiContext() // Update AI context with new data availability (if we store raw data)
-  } catch (error) {
-    // ...
+  } catch (error: any) {
+    console.error(error)
+    if (error.response?.data?.message?.includes('NONE')) {
+       updateTrendChart([]) // Clear chart
+    }
   } finally {
     loading.trend = false
   }
 }
-
-// Ideally call updateAiContext() after all fetches or individually.
-// Let's call it in fetchDashboardData sequence or use a watcher.
-// Simple way: Call it at end of fetchDashboardData logic or inside each fetch.
-// Since fetches are async/parallel, maybe better to watch relevant data.
-
-watch([summary, topRuns, () => filters.projectId], () => {
-    updateAiContext()
-}, { deep: true })
-
 
 const fetchDistribution = async () => {
   loading.distribution = true
@@ -429,8 +441,11 @@ const fetchTopRuns = async () => {
     }
     
     topRuns.value = data || []
-  } catch (error) {
+  } catch (error: any) {
     console.error(error)
+    if (error.response?.data?.message?.includes('NONE')) {
+       topRuns.value = []
+    }
   } finally {
     loading.top = false
   }

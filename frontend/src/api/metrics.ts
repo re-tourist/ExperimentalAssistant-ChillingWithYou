@@ -4,7 +4,7 @@ import type { ApiResponse } from './types'
 export interface MetricDef {
   id?: number
   name: string
-  direction: 'MAX' | 'MIN'
+  direction: 'MAX' | 'MIN' | 'NONE'
   description?: string
   createdAt?: string
   updatedAt?: string

@@ -51,7 +51,7 @@ public class TagController {
         Tag existing = tagService.getOne(new LambdaQueryWrapper<Tag>()
                 .apply("LOWER(name) = {0}", normalized.toLowerCase()));
         if (existing != null) {
-            return Result.success(existing);
+            return Result.error("Tag name already exists");
         }
 
         Tag toSave = new Tag();

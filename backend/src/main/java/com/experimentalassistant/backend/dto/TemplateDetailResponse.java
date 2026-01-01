@@ -9,8 +9,23 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class TemplateDetailResponse extends Template {
+    private List<Field> fields;
     private List<TemplateMetricDetail> metricDefs;
     private List<TemplateTagDetail> tags;
+
+    @Data
+    public static class Field {
+        private String fieldKey;
+        private String label;
+        private String fieldType;
+        private Boolean isRequired;
+        private Boolean isGroupBy;
+        private String defaultValue;
+        private Integer sortOrder;
+        private String optionsJson;
+        private String unit;
+        private String placeholder;
+    }
 
     @Data
     public static class TemplateMetricDetail {

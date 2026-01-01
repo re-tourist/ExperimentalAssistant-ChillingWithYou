@@ -9,8 +9,6 @@ import com.experimentalassistant.backend.service.ProjectService;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
@@ -25,24 +23,20 @@ public class ProjectController {
     public Result<PageResult<Project>> list(@RequestParam(defaultValue = "1") int page,
                                             @RequestParam(defaultValue = "10") int size,
                                             @RequestParam(required = false) String q) {
-        try {
-            Page<Project> projectPage = new Page<>(page, size);
-            LambdaQueryWrapper<Project> wrapper = new LambdaQueryWrapper<>();
-            if (StringUtils.hasText(q)) {
-                wrapper.like(Project::getName, q).or().like(Project::getDescription, q);
-            }
-            projectService.page(projectPage, wrapper);
-
-            PageResult<Project> pageResult = new PageResult<>(
-                    projectPage.getRecords(),
-                    projectPage.getTotal(),
-                    projectPage.getCurrent(),
-                    projectPage.getSize()
-            );
-            return Result.success(pageResult);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+        Page<Project> projectPage = new Page<>(page, size);
+        LambdaQueryWrapper<Project> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(q)) {
+            wrapper.like(Project::getName, q).or().like(Project::getDescription, q);
         }
+        projectService.page(projectPage, wrapper);
+
+        PageResult<Project> pageResult = new PageResult<>(
+                projectPage.getRecords(),
+                projectPage.getTotal(),
+                projectPage.getCurrent(),
+                projectPage.getSize()
+        );
+        return Result.success(pageResult);
     }
 
     @PostMapping

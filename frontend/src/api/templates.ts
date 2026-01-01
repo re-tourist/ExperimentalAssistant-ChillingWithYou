@@ -7,20 +7,30 @@ export interface Template {
   domain: string
   description?: string
   configJson?: string
+  isDefault?: boolean
   createdAt: string
   updatedAt: string
 }
 
-export interface TemplateDetail extends Template {
-  metricDefs: TemplateMetricDetail[]
-  tags: TemplateTagDetail[]
+export interface TemplateField {
+  id?: number
+  fieldKey: string
+  label: string
+  fieldType: 'TEXT' | 'NUMBER' | 'SELECT' | 'BOOLEAN' | 'TEXTAREA'
+  isRequired: boolean
+  isGroupBy?: boolean
+  defaultValue?: string
+  sortOrder: number
+  optionsJson?: string
+  unit?: string
+  placeholder?: string
 }
 
 export interface TemplateMetricDetail {
   metricDefId: number
   name: string
   displayName: string
-  direction: string
+  direction: 'MAX' | 'MIN' | 'NONE'
   isDefault: boolean
   sortOrder: number
 }
@@ -32,11 +42,18 @@ export interface TemplateTagDetail {
   sortOrder: number
 }
 
+export interface TemplateDetail extends Template {
+  fields: TemplateField[]
+  metricDefs: TemplateMetricDetail[]
+  tags: TemplateTagDetail[]
+}
+
 export interface TemplateUpsertRequest {
   name: string
   domain: string
   description?: string
   configJson?: string
+  fields?: TemplateField[]
   metricDefs?: { metricDefId: number; isDefault: boolean; sortOrder: number }[]
   tags?: { tagId: number; isDefault: boolean; sortOrder: number }[]
 }

@@ -108,7 +108,48 @@
 
 ---
 
-## 四、说明
+## 四、AI Chat
+
+### POST /api/ai/chat
+通用 AI 对话接口（OpenAI-compatible 代理）
+
+请求体：
+```json
+{
+  "messages": [
+    {"role": "system", "content": "..."},
+    {"role": "user", "content": "..."}
+  ],
+  "attachments": [
+    {"type": "run", "id": 123, "mode": "compact"},
+    {"type": "note", "projectId": 1, "content": "..."}
+  ],
+  "options": {
+    "temperature": 0.7,
+    "max_tokens": 1000
+  }
+}
+```
+
+响应体：
+```json
+{
+  "code": 0,
+  "data": {
+    "reply": "Assistant response...",
+    "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+    "provider": "dashscope",
+    "model": "qwen-turbo"
+  }
+}
+```
+
+错误码：
+- 1001: AI 未启用（部署环境未配置 KEY）
+
+---
+
+## 五、说明
 
 - Dashboard 接口仅用于聚合查询
 - CRUD 与统计查询逻辑分离

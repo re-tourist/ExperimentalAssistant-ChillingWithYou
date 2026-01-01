@@ -32,6 +32,12 @@
         </div>
       </div>
 
+      <ActiveFilters
+        v-model:filters="filters"
+        :config="filterConfig"
+        @change="handleFiltersChange"
+      />
+
       <!-- Table -->
       <el-table
         v-loading="loading"
@@ -124,7 +130,7 @@
           />
         </el-form-item>
         <el-form-item label="Template" prop="templateId">
-          <el-select v-model="form.templateId" placeholder="Select a template (Optional)" clearable style="width: 100%">
+          <el-select v-model="form.templateId" placeholder="Select a template" style="width: 100%">
             <el-option
               v-for="item in templates"
               :key="item.id"
@@ -154,6 +160,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Refresh } from '@element-plus/icons-vue'
+import ActiveFilters from '@/components/ActiveFilters.vue'
 import { getProjects, createProject, updateProject, deleteProject, type Project } from '@/api/projects'
 import { getRuns } from '@/api/runs'
 import { getTemplates, type Template } from '@/api/templates'
@@ -171,7 +178,11 @@ const pagination = reactive({
 })
 const searchQuery = ref('')
 // Store actual query applied to list (for pagination consistency)
-const appliedQuery = ref('')
+const filters = reactive({ q: '' })
+
+const filterConfig = {
+  q: { label: 'Search' }
+}
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -194,6 +205,9 @@ const rules = reactive<FormRules>({
   ],
   description: [
     { max: 200, message: 'Length should be less than 200', trigger: 'blur' }
+  ],
+  templateId: [
+    { required: true, message: 'Please select a template', trigger: 'change' }
   ]
 })
 
@@ -209,7 +223,7 @@ const fetchProjects = async () => {
     const res = await getProjects({
       page: pagination.page,
       size: pagination.size,
-      q: appliedQuery.value
+      q: filters.q
     })
     projects.value = res.data.records || []
     pagination.total = res.data.total
@@ -245,14 +259,20 @@ const fetchRunCounts = async (projectList: Project[]) => {
 }
 
 const handleSearch = () => {
-  appliedQuery.value = searchQuery.value
+  filters.q = searchQuery.value
   pagination.page = 1
   fetchProjects()
 }
 
 const handleReset = () => {
   searchQuery.value = ''
-  appliedQuery.value = ''
+  filters.q = ''
+  pagination.page = 1
+  fetchProjects()
+}
+
+const handleFiltersChange = () => {
+  searchQuery.value = filters.q || ''
   pagination.page = 1
   fetchProjects()
 }
@@ -293,6 +313,12 @@ const openCreateDialog = async () => {
   try {
     const res = await getTemplates({ page: 1, size: 100 })
     templates.value = res.data.records
+    const defaultTemplate = templates.value.find(t => t.isDefault)
+    if (defaultTemplate) {
+      form.templateId = defaultTemplate.id
+    } else if (templates.value.length > 0) {
+      form.templateId = templates.value[0].id
+    }
   } catch (e) { console.error(e) }
 }
 

@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS run (
     epochs INT COMMENT 'Total Epochs',
     seed INT COMMENT 'Random Seed',
     note TEXT COMMENT 'Run Note',
-    template_id BIGINT COMMENT 'Template ID',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    start_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Run Start Time',
+    end_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Run End Time',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_project_id (project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -63,8 +63,35 @@ CREATE TABLE IF NOT EXISTS template (
     domain VARCHAR(32) DEFAULT 'general' COMMENT 'Domain',
     description VARCHAR(255) COMMENT 'Description',
     config_json TEXT COMMENT 'Configuration JSON',
+    is_default TINYINT(1) DEFAULT 0 COMMENT 'Is Default Template',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS template_field (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    template_id BIGINT NOT NULL,
+    field_key VARCHAR(64) NOT NULL COMMENT 'Field Key (e.g. learning_rate)',
+    label VARCHAR(64) NOT NULL COMMENT 'Display Label',
+    field_type VARCHAR(32) NOT NULL COMMENT 'TEXT, NUMBER, SELECT, BOOLEAN, TEXTAREA',
+    is_required TINYINT(1) DEFAULT 0,
+    is_group_by TINYINT(1) DEFAULT 0 COMMENT 'Is GroupBy field',
+    default_value TEXT COMMENT 'Default Value',
+    sort_order INT DEFAULT 0,
+    options_json TEXT COMMENT 'JSON array for SELECT options',
+    unit VARCHAR(32) COMMENT 'Unit string',
+    placeholder VARCHAR(128) COMMENT 'Input placeholder',
+    UNIQUE KEY uk_template_field (template_id, field_key),
+    INDEX idx_template_id (template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS run_field_value (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id BIGINT NOT NULL,
+    field_key VARCHAR(64) NOT NULL,
+    value_text TEXT,
+    INDEX idx_run_id (run_id),
+    UNIQUE KEY uk_run_field (run_id, field_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS template_metric_def (
@@ -98,18 +125,9 @@ CREATE TABLE IF NOT EXISTS run_note (
     INDEX idx_run_id (run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-SET @sql_run_template_id :=
-    (SELECT IF(
-        EXISTS(
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = DATABASE()
-              AND table_name = 'run'
-              AND column_name = 'template_id'
-        ),
-        'SELECT 1',
-        'ALTER TABLE run ADD COLUMN template_id BIGINT NULL COMMENT ''Template ID'''
-    ));
-PREPARE stmt_run_template_id FROM @sql_run_template_id;
-EXECUTE stmt_run_template_id;
-DEALLOCATE PREPARE stmt_run_template_id;
+CREATE TABLE IF NOT EXISTS domain (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(32) NOT NULL UNIQUE COMMENT 'Domain Name',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS run (
     epochs INT COMMENT 'Total Epochs',
     seed INT COMMENT 'Random Seed',
     note TEXT COMMENT 'Run Note',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    start_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Run Start Time',
+    end_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Run End Time',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_project_id (project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

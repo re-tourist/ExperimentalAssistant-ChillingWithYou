@@ -22,11 +22,11 @@ export function getProjects(params: { page?: number; size?: number; q?: string }
   return request.get<any, ApiResponse<PageResult<Project>>>('/projects', { params })
 }
 
-export function createProject(data: { name: string; description?: string }) {
+export function createProject(data: ProjectCreateUpdate) {
   return request.post<any, ApiResponse<Project>>('/projects', data)
 }
 
-export function updateProject(id: number, data: { name: string; description?: string }) {
+export function updateProject(id: number, data: ProjectCreateUpdate) {
   return request.put<any, ApiResponse<Project>>(`/projects/${id}`, data)
 }
 

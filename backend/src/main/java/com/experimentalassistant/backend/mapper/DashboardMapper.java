@@ -15,5 +15,8 @@ public interface DashboardMapper {
 
     List<DashboardDistributionItem> getDistribution(@Param("filter") DashboardFilter filter);
 
+    List<DashboardDistributionItem> getDistributionByField(@Param("filter") DashboardFilter filter,
+                                                           @Param("fieldKey") String fieldKey);
+
     List<DashboardTopRun> getTopRuns(@Param("filter") DashboardFilter filter);
 }

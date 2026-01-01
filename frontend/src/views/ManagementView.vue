@@ -10,6 +10,9 @@
       <el-tab-pane label="Metric Definitions" name="metrics">
         <MetricDefsTab />
       </el-tab-pane>
+      <el-tab-pane label="Domains" name="domains">
+        <DomainsTab />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -19,6 +22,7 @@ import { ref } from 'vue'
 import TemplatesTab from './management/TemplatesTab.vue'
 import TagsTab from './management/TagsTab.vue'
 import MetricDefsTab from './management/MetricDefsTab.vue'
+import DomainsTab from './management/DomainsTab.vue'
 
 const activeTab = ref('templates')
 </script>

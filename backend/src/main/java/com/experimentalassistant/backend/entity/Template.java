@@ -16,6 +16,7 @@ public class Template {
     private String domain;
     private String description;
     private String configJson;
+    private Boolean isDefault;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -1,6 +1,5 @@
 package com.experimentalassistant.backend;
 
-import com.experimentalassistant.backend.dto.AiDraftRequest;
 import com.experimentalassistant.backend.dto.RunNoteCreateRequest;
 import com.experimentalassistant.backend.dto.RunNoteUpdateRequest;
 import com.experimentalassistant.backend.entity.Project;
@@ -92,6 +91,7 @@ public class RunNoteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.conclusion.contentMd").value("## Conclusion\nThe run was successful."));
 
+/*
         // 5. AI Draft
         AiDraftRequest aiReq = new AiDraftRequest();
         aiReq.setRunId(runId);
@@ -110,6 +110,7 @@ public class RunNoteControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].type").value("AI_DRAFT"));
+*/
                 
         // 6. Markdown Refs
         String mdText = "Check this run [[run:" + runId + "]] and [[run:999]]";

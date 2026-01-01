@@ -1,30 +1,75 @@
 package com.experimentalassistant.backend.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.experimentalassistant.backend.entity.Project;
 import com.experimentalassistant.backend.entity.Template;
+import com.experimentalassistant.backend.entity.TemplateMetricDef;
+import com.experimentalassistant.backend.entity.TemplateTag;
 import com.experimentalassistant.backend.mapper.ProjectMapper;
 import com.experimentalassistant.backend.mapper.TemplateMapper;
+import com.experimentalassistant.backend.mapper.TemplateMetricDefMapper;
+import com.experimentalassistant.backend.mapper.TemplateTagMapper;
 import com.experimentalassistant.backend.service.ProjectService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> implements ProjectService {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private TemplateMapper templateMapper;
     
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private TemplateMetricDefMapper templateMetricDefMapper;
+    
+    @Autowired
+    private TemplateTagMapper templateTagMapper;
+    
+    @Autowired
+    private com.experimentalassistant.backend.mapper.RunMapper runMapper;
+
+    @Autowired
+    private com.experimentalassistant.backend.mapper.RunMetricMapper runMetricMapper;
+
+    @Autowired
+    private com.experimentalassistant.backend.mapper.RunTagMapper runTagMapper;
+
+    @Autowired
+    private com.experimentalassistant.backend.mapper.RunNoteMapper runNoteMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public boolean removeById(java.io.Serializable id) {
+        // Cascade Delete Runs
+        List<com.experimentalassistant.backend.entity.Run> runs = runMapper.selectList(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.Run>().eq(com.experimentalassistant.backend.entity.Run::getProjectId, id));
+        for (com.experimentalassistant.backend.entity.Run run : runs) {
+            Long runId = run.getId();
+            runMetricMapper.delete(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.RunMetric>().eq(com.experimentalassistant.backend.entity.RunMetric::getRunId, runId));
+            runTagMapper.delete(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.RunTag>().eq(com.experimentalassistant.backend.entity.RunTag::getRunId, runId));
+            runNoteMapper.delete(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.RunNote>().eq(com.experimentalassistant.backend.entity.RunNote::getRunId, runId));
+            runMapper.deleteById(runId);
+        }
+        
+        return super.removeById(id);
+    }
     public boolean save(Project project) {
+        if (project.getTemplateId() == null) {
+            Template defaultTemplate = templateMapper.selectOne(new LambdaQueryWrapper<Template>().eq(Template::getIsDefault, true));
+            if (defaultTemplate != null) {
+                project.setTemplateId(defaultTemplate.getId());
+            }
+        }
         handleTemplateSnapshot(project);
         return super.save(project);
     }
@@ -56,9 +101,13 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
                     snapshot.put("sourceTemplateName", template.getName());
                     snapshot.put("domain", template.getDomain());
                     snapshot.put("configJson", template.getConfigJson()); // Inherit the flexible config
-                    // We can also fetch relations (metrics/tags) and put them here if needed.
-                    // For Phase 1, let's snapshot what's on the Template entity + maybe the configJson is enough if it holds everything.
-                    // Wait, Template entity has configJson string.
+                    
+                    // Snapshot relations
+                    List<TemplateMetricDef> metricDefs = templateMetricDefMapper.selectList(new LambdaQueryWrapper<TemplateMetricDef>().eq(TemplateMetricDef::getTemplateId, template.getId()));
+                    snapshot.put("metricDefs", metricDefs);
+
+                    List<TemplateTag> tags = templateTagMapper.selectList(new LambdaQueryWrapper<TemplateTag>().eq(TemplateTag::getTemplateId, template.getId()));
+                    snapshot.put("tags", tags);
                     
                     project.setProjectConfigSnapshot(objectMapper.writeValueAsString(snapshot));
                 } catch (Exception e) {

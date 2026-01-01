@@ -10,8 +10,23 @@ public class TemplateUpsertRequest {
     private String domain;
     private String description;
     private String configJson;
+    private List<Field> fields;
     private List<TemplateMetric> metricDefs;
     private List<TemplateTagInfo> tags;
+
+    @Data
+    public static class Field {
+        private String fieldKey;
+        private String label;
+        private String fieldType;
+        private Boolean isRequired;
+        private Boolean isGroupBy;
+        private String defaultValue;
+        private Integer sortOrder;
+        private String optionsJson;
+        private String unit;
+        private String placeholder;
+    }
 
     @Data
     public static class TemplateMetric {

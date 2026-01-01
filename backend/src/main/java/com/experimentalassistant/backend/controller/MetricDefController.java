@@ -101,7 +101,7 @@ public class MetricDefController {
                 direction = "MAX";
             } else {
                 direction = direction.trim().toUpperCase();
-                if (!"MAX".equals(direction) && !"MIN".equals(direction)) {
+                if (!"MAX".equals(direction) && !"MIN".equals(direction) && !"NONE".equals(direction)) {
                     return Result.error("Invalid direction: " + metricDef.getDirection());
                 }
             }
@@ -125,13 +125,9 @@ public class MetricDefController {
     @DeleteMapping("/{id}")
     @Transactional(rollbackFor = Exception.class)
     public Result<Void> delete(@PathVariable Long id) {
-        try {
-            runMetricMapper.delete(new LambdaQueryWrapper<RunMetric>().eq(RunMetric::getMetricDefId, id));
-            templateMetricDefMapper.delete(new LambdaQueryWrapper<TemplateMetricDef>().eq(TemplateMetricDef::getMetricDefId, id));
-            metricDefService.removeById(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        runMetricMapper.delete(new LambdaQueryWrapper<RunMetric>().eq(RunMetric::getMetricDefId, id));
+        templateMetricDefMapper.delete(new LambdaQueryWrapper<TemplateMetricDef>().eq(TemplateMetricDef::getMetricDefId, id));
+        metricDefService.removeById(id);
+        return Result.success();
     }
 }

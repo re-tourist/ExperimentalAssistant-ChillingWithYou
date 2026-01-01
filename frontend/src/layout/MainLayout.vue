@@ -25,6 +25,10 @@
           <el-icon><Setting /></el-icon>
           <span>Management</span>
         </el-menu-item>
+        <el-menu-item index="/ai">
+          <el-icon><ChatDotSquare /></el-icon>
+          <span>AI Chat</span>
+        </el-menu-item>
         <el-menu-item index="/about">
           <el-icon><InfoFilled /></el-icon>
           <span>About</span>
@@ -37,19 +41,11 @@
         <div class="header-content">
           <span>Experiment Tracking System</span>
         </div>
-        <div class="header-actions">
-           <el-button v-if="aiStore.aiEnabled" type="primary" plain @click="openAiAssistant">
-             <el-icon><ChatDotSquare /></el-icon> AI Assistant
-           </el-button>
-        </div>
       </el-header>
       
       <el-main>
         <router-view />
       </el-main>
-      
-      <!-- Global AI Assistant Drawer -->
-      <AiAssistantDrawer />
     </el-container>
   </el-container>
 </template>
@@ -57,22 +53,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAiStore } from '@/stores/aiAssistant'
-import AiAssistantDrawer from '@/components/AiAssistantDrawer.vue'
-import { ChatDotSquare } from '@element-plus/icons-vue'
+import { 
+  Odometer, 
+  Folder, 
+  DataLine, 
+  Setting, 
+  InfoFilled, 
+  ChatDotSquare 
+} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
-const aiStore = useAiStore()
-
-const openAiAssistant = () => {
-  // Determine mode based on current route
-  let mode: 'dashboard' | 'runs' | 'detail' = 'dashboard'
-  if (route.path.startsWith('/runs')) mode = 'runs'
-  // detail detection might need more logic or just let default run logic handle it
-  
-  aiStore.openDrawer(mode)
-}
 </script>
 
 <style scoped>

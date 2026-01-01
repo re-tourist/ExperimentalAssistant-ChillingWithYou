@@ -5,8 +5,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.experimentalassistant.backend.dto.TemplateDetailResponse;
 import com.experimentalassistant.backend.dto.TemplateUpsertRequest;
-import com.experimentalassistant.backend.entity.*;
-import com.experimentalassistant.backend.mapper.*;
+import com.experimentalassistant.backend.entity.MetricDef;
+import com.experimentalassistant.backend.entity.Tag;
+import com.experimentalassistant.backend.entity.Template;
+import com.experimentalassistant.backend.entity.TemplateMetricDef;
+import com.experimentalassistant.backend.entity.TemplateTag;
+import com.experimentalassistant.backend.mapper.MetricDefMapper;
+import com.experimentalassistant.backend.mapper.TagMapper;
+import com.experimentalassistant.backend.mapper.TemplateMapper;
+import com.experimentalassistant.backend.mapper.TemplateMetricDefMapper;
+import com.experimentalassistant.backend.mapper.TemplateTagMapper;
 import com.experimentalassistant.backend.service.TemplateService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -20,6 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.experimentalassistant.backend.entity.TemplateField;
+import com.experimentalassistant.backend.mapper.TemplateFieldMapper;
+
 @Service
 public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> implements TemplateService {
 
@@ -27,15 +38,18 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
     private final TemplateTagMapper templateTagMapper;
     private final MetricDefMapper metricDefMapper;
     private final TagMapper tagMapper;
+    private final TemplateFieldMapper templateFieldMapper;
 
     public TemplateServiceImpl(TemplateMetricDefMapper templateMetricDefMapper,
                                TemplateTagMapper templateTagMapper,
                                MetricDefMapper metricDefMapper,
-                               TagMapper tagMapper) {
+                               TagMapper tagMapper,
+                               TemplateFieldMapper templateFieldMapper) {
         this.templateMetricDefMapper = templateMetricDefMapper;
         this.templateTagMapper = templateTagMapper;
         this.metricDefMapper = metricDefMapper;
         this.tagMapper = tagMapper;
+        this.templateFieldMapper = templateFieldMapper;
     }
 
     @Override
@@ -48,6 +62,7 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
         if (StringUtils.hasText(domain)) {
             wrapper.eq(Template::getDomain, domain);
         }
+        // Ensure default templates are visible or prioritized if needed, but for now simple list
         wrapper.orderByDesc(Template::getId);
         return this.page(templatePage, wrapper);
     }
@@ -61,6 +76,19 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
 
         TemplateDetailResponse response = new TemplateDetailResponse();
         BeanUtils.copyProperties(template, response);
+
+        // Fetch Fields
+        List<TemplateField> fields = templateFieldMapper.selectList(
+                new LambdaQueryWrapper<TemplateField>()
+                        .eq(TemplateField::getTemplateId, id)
+                        .orderByAsc(TemplateField::getSortOrder)
+        );
+        List<TemplateDetailResponse.Field> fieldDetails = fields.stream().map(f -> {
+            TemplateDetailResponse.Field fd = new TemplateDetailResponse.Field();
+            BeanUtils.copyProperties(f, fd);
+            return fd;
+        }).collect(Collectors.toList());
+        response.setFields(fieldDetails);
 
         // Fetch Metrics
         List<TemplateMetricDef> tMetrics = templateMetricDefMapper.selectList(
@@ -127,6 +155,7 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
         if (!StringUtils.hasText(template.getDomain())) {
             template.setDomain("general");
         }
+        template.setIsDefault(false); // Default templates are created via init script or special admin API
         template.setCreatedAt(LocalDateTime.now());
         template.setUpdatedAt(LocalDateTime.now());
         this.save(template);
@@ -146,8 +175,15 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
             throw new RuntimeException("Template not found");
         }
 
+        // Preserve isDefault and createdAt
+        Boolean isDefault = template.getIsDefault();
+        LocalDateTime createdAt = template.getCreatedAt();
+
         BeanUtils.copyProperties(request, template);
         template.setId(id);
+        template.setIsDefault(isDefault);
+        template.setCreatedAt(createdAt);
+        
         if (!StringUtils.hasText(template.getDomain())) {
             template.setDomain("general");
         }
@@ -155,6 +191,7 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
         this.updateById(template);
 
         // Delete old relations
+        templateFieldMapper.delete(new LambdaQueryWrapper<TemplateField>().eq(TemplateField::getTemplateId, id));
         templateMetricDefMapper.delete(new LambdaQueryWrapper<TemplateMetricDef>().eq(TemplateMetricDef::getTemplateId, id));
         templateTagMapper.delete(new LambdaQueryWrapper<TemplateTag>().eq(TemplateTag::getTemplateId, id));
 
@@ -166,6 +203,11 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteTemplate(Long id) {
+        Template t = this.getById(id);
+        if (t != null && Boolean.TRUE.equals(t.getIsDefault())) {
+            throw new RuntimeException("Cannot delete default template");
+        }
+        templateFieldMapper.delete(new LambdaQueryWrapper<TemplateField>().eq(TemplateField::getTemplateId, id));
         templateMetricDefMapper.delete(new LambdaQueryWrapper<TemplateMetricDef>().eq(TemplateMetricDef::getTemplateId, id));
         templateTagMapper.delete(new LambdaQueryWrapper<TemplateTag>().eq(TemplateTag::getTemplateId, id));
         this.removeById(id);
@@ -179,6 +221,20 @@ public class TemplateServiceImpl extends ServiceImpl<TemplateMapper, Template> i
     }
 
     private void saveRelations(Long templateId, TemplateUpsertRequest request) {
+        // Save Fields
+        if (!CollectionUtils.isEmpty(request.getFields())) {
+            int order = 0;
+            for (TemplateUpsertRequest.Field f : request.getFields()) {
+                TemplateField tf = new TemplateField();
+                BeanUtils.copyProperties(f, tf);
+                tf.setTemplateId(templateId);
+                if (tf.getSortOrder() == null) {
+                    tf.setSortOrder(order++);
+                }
+                templateFieldMapper.insert(tf);
+            }
+        }
+
         if (!CollectionUtils.isEmpty(request.getMetricDefs())) {
             int order = 0;
             for (TemplateUpsertRequest.TemplateMetric tm : request.getMetricDefs()) {

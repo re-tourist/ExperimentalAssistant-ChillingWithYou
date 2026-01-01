@@ -5,22 +5,39 @@
     size="50%"
     :before-close="handleClose"
   >
-    <div v-if="run" class="run-detail" v-loading="loading">
+    <div class="run-detail" v-loading="loading">
+      <el-empty v-if="!run && !loading" description="No run selected." />
+      <div v-else-if="run">
       <el-descriptions :column="2" border class="mb-4">
         <el-descriptions-item label="ID">{{ run.id }}</el-descriptions-item>
         <el-descriptions-item label="Name">{{ run.name }}</el-descriptions-item>
         <el-descriptions-item label="Project ID">{{ run.projectId }}</el-descriptions-item>
+        <el-descriptions-item label="Start Time">{{ formatDateTime(run.startTime) }}</el-descriptions-item>
+        <el-descriptions-item label="End Time">{{ formatDateTime(run.endTime || run.updatedAt) }}</el-descriptions-item>
         <el-descriptions-item label="Status">
            <el-tag :type="getStatusType(run.status)">{{ run.status }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="Model">{{ run.modelName }}</el-descriptions-item>
-        <el-descriptions-item label="Dataset">{{ run.datasetName }}</el-descriptions-item>
-        <el-descriptions-item label="Optimizer">{{ run.optimizer }}</el-descriptions-item>
-        <el-descriptions-item label="LR">{{ run.lr }}</el-descriptions-item>
-        <el-descriptions-item label="Batch">{{ run.batchSize }}</el-descriptions-item>
-        <el-descriptions-item label="Epochs">{{ run.epochs }}</el-descriptions-item>
-        <el-descriptions-item label="Seed">{{ run.seed }}</el-descriptions-item>
-        <el-descriptions-item label="Created">{{ formatDateTime(run.createdAt) }}</el-descriptions-item>
+        
+        <!-- Legacy fields support -->
+        <el-descriptions-item v-if="run.modelName" label="Model">{{ run.modelName }}</el-descriptions-item>
+        <el-descriptions-item v-if="run.datasetName" label="Dataset">{{ run.datasetName }}</el-descriptions-item>
+        <el-descriptions-item v-if="run.optimizer" label="Optimizer">{{ run.optimizer }}</el-descriptions-item>
+        <el-descriptions-item v-if="run.lr !== undefined" label="LR">{{ run.lr }}</el-descriptions-item>
+        <el-descriptions-item v-if="run.batchSize !== undefined" label="Batch">{{ run.batchSize }}</el-descriptions-item>
+        <el-descriptions-item v-if="run.epochs !== undefined" label="Epochs">{{ run.epochs }}</el-descriptions-item>
+        <el-descriptions-item v-if="run.seed !== undefined" label="Seed">{{ run.seed }}</el-descriptions-item>
+
+        <!-- Dynamic fields support -->
+        <template v-if="run.fieldValues">
+           <el-descriptions-item 
+              v-for="(val, key) in run.fieldValues" 
+              :key="key" 
+              :label="key"
+           >
+              {{ val }}
+           </el-descriptions-item>
+        </template>
+        
       </el-descriptions>
       
       <el-tabs v-model="activeTab" class="detail-tabs">
@@ -65,16 +82,8 @@
             @run-click="handleRunLinkClick" 
           />
         </el-tab-pane>
-
-        <el-tab-pane label="AI Analysis" name="ai">
-          <AiTab 
-            :runId="run.id" 
-            @run-click="handleRunLinkClick" 
-            @refresh-notes="handleRefreshNotes"
-            @refresh-conclusion="handleRefreshConclusion"
-          />
-        </el-tab-pane>
       </el-tabs>
+      </div>
     </div>
   </el-drawer>
 </template>
@@ -85,7 +94,6 @@ import { getRun } from '@/api/runs'
 import type { RunDetail } from '@/api/runs'
 import NotesTab from './components/NotesTab.vue'
 import ConclusionTab from './components/ConclusionTab.vue'
-import AiTab from './components/AiTab.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -97,28 +105,29 @@ const emit = defineEmits(['update:modelValue', 'update:runId'])
 const loading = ref(false)
 const run = ref<RunDetail | null>(null)
 const activeTab = ref('overview')
-const conclusionTabRef = ref<any>(null)
 
 const visible = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val)
 })
 
-watch(() => props.runId, async (newId) => {
-  if (newId) {
-    await fetchRunDetail(newId)
-    // Reset tab to overview when opening a new run, or keep it?
-    // Requirement says "prevent infinite recursion: allow jump, but drawer is same".
-    // It's better to keep user context if they are clicking links, but maybe overview is safer default.
-    // Let's keep current tab if it exists, otherwise default to overview.
-  } else {
-    run.value = null
-  }
-})
+watch(
+  () => [props.modelValue, props.runId] as const,
+  async ([isOpen, runId]) => {
+    if (!isOpen) return
+    if (runId) {
+      await fetchRunDetail(runId)
+    } else {
+      run.value = null
+    }
+  },
+  { immediate: true }
+)
 
 const fetchRunDetail = async (id: number) => {
   loading.value = true
   try {
+    run.value = null
     const res = await getRun(id)
     run.value = res.data
   } catch (error) {
@@ -140,30 +149,13 @@ const getStatusType = (status: string) => {
   }
 }
 
-const formatDateTime = (val: string) => {
+const formatDateTime = (val?: string) => {
   return val ? new Date(val).toLocaleString() : '-'
 }
 
 const handleRunLinkClick = (id: number) => {
   // Update the prop to switch context
   emit('update:runId', id)
-}
-
-const handleRefreshNotes = () => {
-  // Notes tab watches runId, but here runId hasn't changed.
-  // We need a way to force refresh NotesTab.
-  // Actually, NotesTab component can expose a refresh method or we can use a key.
-  // But since we are using <NotesTab :runId="run.id">, maybe we can just let it be.
-  // The user will switch to Notes tab to see it.
-  // Or we can use a ref on NotesTab.
-  // For now, let's keep it simple. The user might need to switch tabs or we can rely on manual refresh.
-  // Better: make NotesTab fetch on activation?
-}
-
-const handleRefreshConclusion = () => {
-  if (conclusionTabRef.value) {
-    conclusionTabRef.value.fetchData?.()
-  }
 }
 </script>
 
