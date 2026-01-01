@@ -10,6 +10,7 @@ import java.util.List;
 public class RunDetailResponse extends Run {
     private List<Tag> tags;
     private List<MetricDetail> metrics;
+    private java.util.Map<String, Object> fieldValues;
 
     @Data
     public static class MetricDetail {

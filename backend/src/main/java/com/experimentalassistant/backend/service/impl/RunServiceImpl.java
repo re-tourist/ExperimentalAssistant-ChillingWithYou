@@ -16,6 +16,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +46,12 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements RunSe
 
         Run run = new Run();
         BeanUtils.copyProperties(request, run);
+        if (run.getStartTime() == null) {
+            run.setStartTime(LocalDateTime.now());
+        }
+        if (run.getEndTime() == null) {
+            run.setEndTime(run.getStartTime());
+        }
         this.save(run);
 
         saveMetrics(run.getId(), request.getMetrics());
@@ -63,7 +70,15 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements RunSe
             throw new RuntimeException("Run not found");
         }
 
+        LocalDateTime existingStartTime = run.getStartTime();
+        LocalDateTime existingEndTime = run.getEndTime();
         BeanUtils.copyProperties(request, run);
+        if (run.getStartTime() == null) {
+            run.setStartTime(existingStartTime != null ? existingStartTime : LocalDateTime.now());
+        }
+        if (run.getEndTime() == null) {
+            run.setEndTime(existingEndTime != null ? existingEndTime : run.getStartTime());
+        }
         run.setId(id);
         this.updateById(run);
 
@@ -148,10 +163,10 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements RunSe
             wrapper.and(w -> w.like(Run::getName, q).or().like(Run::getModelName, q).or().like(Run::getNote, q));
         }
         if (dateFrom != null) {
-            wrapper.ge(Run::getCreatedAt, dateFrom.atStartOfDay());
+            wrapper.ge(Run::getEndTime, dateFrom.atStartOfDay());
         }
         if (dateTo != null) {
-            wrapper.le(Run::getCreatedAt, dateTo.plusDays(1).atStartOfDay());
+            wrapper.le(Run::getEndTime, dateTo.plusDays(1).atStartOfDay());
         }
 
         // Tag filtering logic

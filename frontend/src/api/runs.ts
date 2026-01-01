@@ -8,35 +8,40 @@ export interface Run {
   status: string
   modelName?: string
   datasetName?: string
-  createdAt: string
-  updatedAt: string
+  startTime?: string
+  endTime?: string
+  updatedAt?: string
 }
 
 export interface RunDetail extends Run {
+  // Legacy fixed fields support (optional)
   optimizer?: string
   lr?: number
   batchSize?: number
   epochs?: number
   seed?: number
+  
   note?: string
   metrics: { metricDefId: number; name?: string; displayName?: string; direction?: string; value: number }[]
   tags: { id: number; name: string }[]
+  
+  // Dynamic fields
+  fieldValues?: Record<string, any>
 }
 
 export interface RunCreateUpdate {
   projectId: number
   name: string
-  status?: string // Added status
-  modelName?: string
-  datasetName?: string
-  optimizer?: string
-  lr?: number
-  batchSize?: number
-  epochs?: number
-  seed?: number
+  status?: string
+  
+  // Dynamic fields map (key: fieldKey, value: string/number)
+  fieldValues?: Record<string, any>
+  
   note?: string
   metrics?: { metricDefId: number; value: number }[]
   tagIds?: number[]
+  startTime?: string
+  endTime?: string
 }
 
 export function getRuns(params: {

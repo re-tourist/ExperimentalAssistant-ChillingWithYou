@@ -1,6 +1,7 @@
 package com.experimentalassistant.backend.dto;
 
 import lombok.Data;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -16,8 +17,11 @@ public class RunCreateUpdateRequest {
     private Integer epochs;
     private Integer seed;
     private String note;
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
     private List<Long> tagIds;
     private List<Metric> metrics;
+    private java.util.Map<String, Object> fieldValues;
 
     @Data
     public static class Metric {
