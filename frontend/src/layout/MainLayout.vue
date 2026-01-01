@@ -31,6 +31,7 @@
       <el-header>
         <div class="header-content">
           <span>Experiment Tracking System</span>
+          <el-button type="primary" plain @click="aiStore.openDrawer('dashboard')">AI Assistant</el-button>
         </div>
       </el-header>
       
@@ -39,14 +40,18 @@
       </el-main>
     </el-container>
   </el-container>
+  <AiAssistantDrawer />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import AiAssistantDrawer from '@/components/AiAssistantDrawer.vue'
+import { useAiStore } from '@/stores/aiAssistant'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
+const aiStore = useAiStore()
 </script>
 
 <style scoped>
@@ -92,6 +97,10 @@ const activeMenu = computed(() => route.path)
 }
 
 .header-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 16px;
   color: #333;
 }

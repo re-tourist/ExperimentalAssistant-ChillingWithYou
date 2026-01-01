@@ -176,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { 
@@ -191,6 +191,7 @@ import {
 import { getProjects, type Project } from '@/api/projects'
 import { getMetricDefs, type MetricDef } from '@/api/metrics'
 import { dashboardCache } from '@/utils/cache'
+import { useAiStore } from '@/stores/aiAssistant'
 
 // State
 const projects = ref<Project[]>([])
@@ -221,6 +222,10 @@ const summary = ref<SummaryResponse>({
 })
 
 const topRuns = ref<TopRun[]>([])
+const trendData = ref<any[] | null>(null)
+const distributionData = ref<any[] | null>(null)
+
+const aiStore = useAiStore()
 
 // Chart Refs
 const trendChartRef = ref<HTMLElement | null>(null)
@@ -245,8 +250,33 @@ const resetDashboardData = () => {
     successRate: 0
   }
   topRuns.value = []
+  trendData.value = null
+  distributionData.value = null
   trendChart?.clear()
   distributionChart?.clear()
+}
+
+const updateAiProjectContext = () => {
+  const pid = filters.projectId
+  if (pid == null) return
+
+  const p = projects.value.find(p0 => p0.id === pid)
+  if (!p || p.id == null) return
+
+  aiStore.setProjectContext({
+    id: p.id,
+    name: p.name,
+    description: p.description
+  })
+}
+
+const updateAiDashboardContext = () => {
+  aiStore.setDashboardContext({
+    summary: summary.value,
+    trend: trendData.value,
+    distribution: distributionData.value,
+    top_runs: topRuns.value
+  })
 }
 
 const handleDateChange = (val: [string, string] | null) => {
@@ -286,6 +316,8 @@ const fetchOptions = async () => {
     if (metricDefs.value.length > 0) {
       filters.metricDefId = metricDefs.value[0].id
     }
+
+    updateAiProjectContext()
   } catch (error) {
     console.error('Failed to load options', error)
   }
@@ -322,6 +354,7 @@ const fetchSummary = async () => {
       summary.value = res.data
       dashboardCache.set(cacheKey, res.data)
     }
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -342,6 +375,8 @@ const fetchTrend = async () => {
     }
     
     updateTrendChart(data)
+    trendData.value = data
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -362,6 +397,8 @@ const fetchDistribution = async () => {
     }
     
     updateDistributionChart(data)
+    distributionData.value = data
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -382,6 +419,7 @@ const fetchTopRuns = async () => {
     }
     
     topRuns.value = data || []
+    updateAiDashboardContext()
   } catch (error) {
     console.error(error)
   } finally {
@@ -455,6 +493,14 @@ onUnmounted(() => {
   trendChart?.dispose()
   distributionChart?.dispose()
 })
+
+watch(
+  () => filters.projectId,
+  () => {
+    updateAiProjectContext()
+    updateAiDashboardContext()
+  }
+)
 </script>
 
 <style scoped>

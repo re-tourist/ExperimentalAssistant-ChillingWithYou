@@ -278,6 +278,9 @@
       size="50%"
     >
       <div v-if="currentRun" class="run-detail">
+        <div style="margin-bottom: 12px; display: flex; justify-content: flex-end">
+          <el-button type="primary" @click="openAiForCurrentRun">AI Assistant</el-button>
+        </div>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="ID">{{ currentRun.id }}</el-descriptions-item>
           <el-descriptions-item label="Name">{{ currentRun.name }}</el-descriptions-item>
@@ -337,8 +340,10 @@ import type { Run, RunDetail, RunCreateUpdate } from '@/api/runs'
 import type { Project } from '@/api/projects'
 import type { Tag } from '@/api/tags'
 import type { MetricDef } from '@/api/metrics'
+import { useAiStore, type AiContextRun } from '@/stores/aiAssistant'
 
 const route = useRoute()
+const aiStore = useAiStore()
 
 // --- State ---
 const loading = ref(false)
@@ -666,8 +671,59 @@ const getStatusType = (status: string) => {
   }
 }
 
-const formatDateTime = (val: string) => {
+const formatDateTime = (val?: string) => {
   return val ? new Date(val).toLocaleString() : '-'
+}
+
+const updateAiProjectContext = (projectId?: number) => {
+  const pid = projectId ?? filters.projectId
+  if (pid == null) return
+  const p = projects.value.find(p0 => p0.id === pid)
+  if (!p || p.id == null) return
+
+  aiStore.setProjectContext({
+    id: p.id,
+    name: p.name,
+    description: p.description
+  })
+}
+
+const toAiContextRunDetail = (r: RunDetail): AiContextRun => {
+  const metrics: Record<string, number> = {}
+  ;(r.metrics || []).forEach(m => {
+    const key = (m.displayName || m.name || String(m.metricDefId)).trim()
+    if (!key) return
+    if (typeof m.value === 'number') {
+      metrics[key] = m.value
+    }
+  })
+
+  return {
+    run_id: r.id,
+    name: r.name,
+    status: r.status,
+    tags: (r.tags || []).map(t => t.name).filter(Boolean),
+    metrics,
+    hyperparameters: {
+      modelName: r.modelName,
+      datasetName: r.datasetName,
+      optimizer: r.optimizer,
+      lr: r.lr,
+      batchSize: r.batchSize,
+      epochs: r.epochs,
+      seed: r.seed
+    },
+    note: r.note
+  }
+}
+
+const upsertAiRun = (aiRun: AiContextRun) => {
+  const idx = aiStore.availableRuns.findIndex(r => r.run_id === aiRun.run_id)
+  if (idx >= 0) {
+    aiStore.availableRuns[idx] = aiRun
+  } else {
+    aiStore.availableRuns.push(aiRun)
+  }
 }
 
 // --- Detail Drawer ---
@@ -676,9 +732,23 @@ const handleRowClick = async (row: Run) => {
     const res = await getRun(row.id)
     currentRun.value = res.data
     drawerVisible.value = true
+
+    updateAiProjectContext(res.data.projectId)
+    const aiRun = toAiContextRunDetail(res.data)
+    upsertAiRun(aiRun)
+    aiStore.selectRun(aiRun.run_id)
   } catch (error) {
     console.error(error)
   }
+}
+
+const openAiForCurrentRun = () => {
+  if (!currentRun.value) return
+  updateAiProjectContext(currentRun.value.projectId)
+  const aiRun = toAiContextRunDetail(currentRun.value)
+  upsertAiRun(aiRun)
+  aiStore.selectRun(aiRun.run_id)
+  aiStore.openDrawer('detail')
 }
 
 // --- Create/Edit Dialog ---
