@@ -45,9 +45,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
     @Autowired
     private com.experimentalassistant.backend.mapper.RunTagMapper runTagMapper;
 
-    @Autowired
-    private com.experimentalassistant.backend.mapper.RunNoteMapper runNoteMapper;
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean removeById(java.io.Serializable id) {
@@ -57,7 +54,6 @@ public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> impl
             Long runId = run.getId();
             runMetricMapper.delete(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.RunMetric>().eq(com.experimentalassistant.backend.entity.RunMetric::getRunId, runId));
             runTagMapper.delete(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.RunTag>().eq(com.experimentalassistant.backend.entity.RunTag::getRunId, runId));
-            runNoteMapper.delete(new LambdaQueryWrapper<com.experimentalassistant.backend.entity.RunNote>().eq(com.experimentalassistant.backend.entity.RunNote::getRunId, runId));
             runMapper.deleteById(runId);
         }
         
