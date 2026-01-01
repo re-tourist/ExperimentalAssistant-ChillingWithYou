@@ -40,7 +40,7 @@ public class MetricDefController {
             metricDef.setDirection("MAX");
         } else {
             String normalizedDirection = direction.trim().toUpperCase();
-            if (!"MAX".equals(normalizedDirection) && !"MIN".equals(normalizedDirection)) {
+            if (!"MAX".equals(normalizedDirection) && !"MIN".equals(normalizedDirection) && !"NONE".equals(normalizedDirection)) {
                 return Result.error("Invalid direction: " + direction);
             }
             metricDef.setDirection(normalizedDirection);

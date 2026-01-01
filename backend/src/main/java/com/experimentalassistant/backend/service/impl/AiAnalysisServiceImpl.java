@@ -48,6 +48,9 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
     private TemplateMapper templateMapper;
 
     @Autowired
+    private ProjectMapper projectMapper;
+
+    @Autowired
     private MetricDefMapper metricDefMapper;
 
     @Autowired
@@ -97,10 +100,13 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
             context.put("tags", tagNames);
         }
 
-        if (request.isIncludeTemplate() && run.getTemplateId() != null) {
-            Template template = templateMapper.selectById(run.getTemplateId());
-            if (template != null) {
-                context.put("template", template);
+        if (request.isIncludeTemplate() && run.getProjectId() != null) {
+            Project project = projectMapper.selectById(run.getProjectId());
+            if (project != null && project.getTemplateId() != null) {
+                Template template = templateMapper.selectById(project.getTemplateId());
+                if (template != null) {
+                    context.put("template", template);
+                }
             }
         }
 
