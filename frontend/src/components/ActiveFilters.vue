@@ -32,7 +32,7 @@ import { computed } from 'vue'
 interface FilterConfig {
   [key: string]: {
     label: string
-    formatter?: (_val: any) => string
+    formatter?: any
   }
 }
 
