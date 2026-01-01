@@ -42,7 +42,7 @@ export interface TopRun {
   modelName: string
   datasetName: string
   value: number
-  createdAt: string
+  endTime: string
   status: string
 }
 
