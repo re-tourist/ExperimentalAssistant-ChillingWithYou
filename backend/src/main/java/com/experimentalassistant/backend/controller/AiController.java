@@ -7,6 +7,7 @@ import com.experimentalassistant.backend.dto.ai.AiChatResponse;
 import com.experimentalassistant.backend.dto.ai.AiConfigResponse;
 import com.experimentalassistant.backend.service.AiService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -23,7 +24,15 @@ public class AiController {
     @GetMapping("/config")
     public Result<AiConfigResponse> config() {
         AiConfigResponse res = new AiConfigResponse();
-        res.setEnabled(aiProperties.isEnable() && !"mock".equalsIgnoreCase(aiProperties.getProvider()));
+        boolean enabled = false;
+        if (aiProperties.isEnable()) {
+            if ("mock".equalsIgnoreCase(aiProperties.getProvider())) {
+                enabled = true;
+            } else if ("http".equalsIgnoreCase(aiProperties.getProvider())) {
+                enabled = aiProperties.getHttp() != null && StringUtils.hasText(aiProperties.getHttp().getApiKey());
+            }
+        }
+        res.setEnabled(enabled);
         res.setProvider(aiProperties.getProvider());
         res.setModel(aiProperties.getHttp() != null ? aiProperties.getHttp().getModel() : null);
         res.setBaseUrl(aiProperties.getHttp() != null ? aiProperties.getHttp().getBaseUrl() : null);
